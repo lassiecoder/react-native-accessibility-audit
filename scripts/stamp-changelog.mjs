@@ -31,6 +31,8 @@ if (section === '') {
 
 if (process.argv.includes('--check')) process.exit(0);
 
-const date = new Date().toISOString().slice(0, 10);
+// The maintainer's local date, which is the release date they'd expect.
+const now = new Date();
+const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
 writeFileSync(file, changelog.replace(heading, `## Unreleased\n\n## ${version} - ${date}\n`));
 console.log(`stamp-changelog: CHANGELOG.md section "${version} - ${date}" created.`);

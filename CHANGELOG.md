@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
-First release, planned as 0.1.0.
+First release.
 
 ### Matcher
 
