@@ -57,12 +57,14 @@ Old rule IDs are accepted in `rules` and mapped to the new rules. Unknown IDs th
 | `pressable-accessible-required` | `interactive-accessible-required` |
 | `checked-state-required` | `state-required` |
 | `adjustable-value-required` | `state-required` |
+| `adjustable-role-required` | `adjustable-role-required` (narrower; see below) |
 | `link-role-misused` | `link-role-misused` |
 | `no-empty-text` | `no-empty-text` |
 | `disabled-state-required` | Accepted, does nothing: React Native's pressables expose `disabled` themselves |
-| `adjustable-role-required` | Accepted, not covered yet |
 
 Because several old IDs map to one new rule, enabling one of them enables the whole new rule. For example, `rules: ['checked-state-required']` also checks slider values.
+
+`adjustable-role-required` changed behavior. The old rule required `accessibilityRole="adjustable"` on every `Slider`. Native sliders are already adjustable on iOS and Android, so they now need no role, and only a conflicting role (such as `button`) is reported. Instead, the rule now checks custom controls that expose `increment` / `decrement` actions. Tests that expected a failure for a role-less `Slider` will pass now.
 
 ## 5. Expect more findings
 

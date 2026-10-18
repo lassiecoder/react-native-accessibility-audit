@@ -127,6 +127,7 @@ Errors fail the test. Warnings are printed but don't fail it, because they depen
 | [image-label-required](docs/rules.md#image-label-required) | error | images have a label or are marked as decorative |
 | [no-nested-interactive](docs/rules.md#no-nested-interactive) | error | pressable elements aren't nested inside other pressable elements |
 | [state-required](docs/rules.md#state-required) | error | checkboxes, radios and switches expose `checked`; sliders expose a value |
+| [adjustable-role-required](docs/rules.md#adjustable-role-required) | error | controls with `increment` / `decrement` actions have an adjustable role, and native sliders keep theirs |
 | [link-role-misused](docs/rules.md#link-role-misused) | error | the `link` role is only used on something that can be pressed |
 | [no-empty-text](docs/rules.md#no-empty-text) | error | `Text` elements aren't empty |
 | [touch-target-size](docs/rules.md#touch-target-size) | warning | touch targets are at least 44×44 (when the size is set in styles) |

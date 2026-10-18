@@ -13,7 +13,8 @@ First release. Not yet published to npm.
 
 ### Rules
 
-- Errors: `interactive-role-required`, `interactive-label-required`, `interactive-accessible-required`, `image-label-required`, `no-nested-interactive`, `state-required`, `link-role-misused`, `no-empty-text`.
+- Errors: `interactive-role-required`, `interactive-label-required`, `interactive-accessible-required`, `image-label-required`, `no-nested-interactive`, `state-required`, `adjustable-role-required`, `link-role-misused`, `no-empty-text`.
+- `adjustable-role-required` checks custom controls with `increment` / `decrement` actions and conflicting roles on native sliders. Native sliders without a role pass, unlike in react-native-accessibility-engine.
 - Warnings: `touch-target-size` (`minTouchTarget` option, default 44) and `text-contrast` (WCAG AA), checked when sizes and colors are known from styles.
 
 ### Configuration

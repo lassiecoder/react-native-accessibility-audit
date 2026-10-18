@@ -7,15 +7,15 @@ export interface ResolvedOptions extends Omit<AuditOptions, 'rules'> {
 }
 
 // react-native-accessibility-engine rule IDs and the rule that now covers
-// them. null: no longer needed (React Native exposes disabled state itself)
-// or not covered yet; accepted so migrated configs don't throw.
+// them. null: no longer needed (React Native exposes disabled state itself);
+// accepted so migrated configs don't throw.
 const LEGACY_RULES: Record<LegacyRuleId, RuleId | null> = {
   'pressable-accessible-required': 'interactive-accessible-required',
   'pressable-role-required': 'interactive-role-required',
   'pressable-label-required': 'interactive-label-required',
   'link-role-required': 'interactive-role-required',
   'link-role-misused': 'link-role-misused',
-  'adjustable-role-required': null,
+  'adjustable-role-required': 'adjustable-role-required',
   'adjustable-value-required': 'state-required',
   'checked-state-required': 'state-required',
   'disabled-state-required': null,

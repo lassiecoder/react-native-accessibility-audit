@@ -94,6 +94,10 @@ describe('rules option', () => {
     ]);
   });
 
+  test('adjustable-role-required keeps its ID', async () => {
+    expect(await ruleIds({ rules: ['adjustable-role-required'] })).toEqual([]);
+  });
+
   test('retired legacy rule IDs are accepted', async () => {
     expect(await ruleIds({ rules: ['disabled-state-required', 'no-empty-text'] })).toEqual(['no-empty-text']);
   });

@@ -10,6 +10,7 @@ Elements hidden from screen readers (`aria-hidden`, `accessibilityElementsHidden
 - [image-label-required](#image-label-required)
 - [no-nested-interactive](#no-nested-interactive)
 - [state-required](#state-required)
+- [adjustable-role-required](#adjustable-role-required)
 - [link-role-misused](#link-role-misused)
 - [no-empty-text](#no-empty-text)
 - [touch-target-size](#touch-target-size)
@@ -156,9 +157,42 @@ A checkbox that doesn't say whether it's checked, or a slider that doesn't say i
 
 - `checkbox`, `radio`, `switch` and `togglebutton` need `checked` set to `true` or `false`. Checkboxes may also use `'mixed'`.
 - `adjustable`, `slider` and `spinbutton` need `accessibilityValue.now` / `aria-valuenow`, or `accessibilityValue.text` / `aria-valuetext`.
-- The native `Switch` is exempt; it reports its value itself.
+- The native `Switch` and sliders from `@react-native-community/slider` are exempt; they report their value themselves.
 
 Disabled state isn't checked: `Pressable`, `Touchable*` and `Button` expose `disabled` automatically. The old `disabled-state-required` rule ID is accepted and does nothing.
+
+## adjustable-role-required
+
+**Default: error.** Same ID as in react-native-accessibility-engine, with a narrower check (see below).
+
+Custom adjustable controls, like steppers, ratings and custom sliders, usually expose `increment` and `decrement` accessibility actions. VoiceOver only offers them (swipe up or down) when the element has the `adjustable` role. Without it, people using a screen reader can't change the value.
+
+```tsx
+// ✗ Actions VoiceOver can't trigger
+<View
+  accessible
+  accessibilityLabel="Quantity"
+  accessibilityValue={{ min: 1, max: 9, now: quantity }}
+  accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+  onAccessibilityAction={onAction}
+/>
+
+// ✓
+<View
+  accessible
+  accessibilityRole="adjustable"
+  accessibilityLabel="Quantity"
+  accessibilityValue={{ min: 1, max: 9, now: quantity }}
+  accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+  onAccessibilityAction={onAction}
+/>
+```
+
+`adjustable`, `slider` and `spinbutton` all count as adjustable roles. An adjustable element also needs a current value; [state-required](#state-required) checks that.
+
+**Native sliders.** `Slider` from `@react-native-community/slider` is a `UISlider` on iOS and a `SeekBar` on Android, which screen readers already treat as adjustable. It needs no role. Setting a different role, such as `button`, replaces that behavior and is reported.
+
+**Different from react-native-accessibility-engine.** The old rule required `accessibilityRole="adjustable"` on every `Slider`, recognized by its component name. This version doesn't require a role on native sliders, and it checks custom controls by their `increment` / `decrement` actions instead of their name.
 
 ## link-role-misused
 

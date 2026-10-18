@@ -21,6 +21,7 @@ export type RuleId =
   | 'image-label-required'
   | 'no-nested-interactive'
   | 'state-required'
+  | 'adjustable-role-required'
   | 'link-role-misused'
   | 'no-empty-text'
   | 'touch-target-size'

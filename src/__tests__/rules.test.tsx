@@ -7,7 +7,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  type ViewProps,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { render, screen } from '@testing-library/react-native';
 
 import { audit } from '../index';
@@ -296,5 +298,58 @@ describe('text-contrast', () => {
     ['platform color', <View style={{ backgroundColor: '#fff' }}><Text style={{ color: { semantic: ['label'] } as never }}>x</Text></View>],
   ])('passes %s', async (_, el) => {
     expect(await contrast(el)).toEqual([]);
+  });
+});
+
+describe('adjustable-role-required', () => {
+  const rule = 'adjustable-role-required';
+  const stepActions = [{ name: 'increment' }, { name: 'decrement' }];
+
+  // A custom control VoiceOver users adjust by swiping up/down.
+  function Stepper(props: ViewProps) {
+    return (
+      <View
+        accessible
+        accessibilityLabel="Quantity"
+        accessibilityValue={{ min: 1, max: 9, now: 2 }}
+        accessibilityActions={stepActions}
+        onAccessibilityAction={noop}
+        {...props}
+      >
+        <Text>2</Text>
+      </View>
+    );
+  }
+
+  test.each([
+    ['no role', <Stepper />, 'Element exposes the "increment" and "decrement" actions but has no role, so screen reader users can\'t adjust it.'],
+    ['wrong role', <Stepper accessibilityRole="button" />, 'Element exposes the "increment" and "decrement" actions but has the role "button", so screen reader users can\'t adjust it.'],
+    ['only increment', <Stepper accessibilityActions={[{ name: 'increment' }]} />, 'Element exposes the "increment" action but has no role, so screen reader users can\'t adjust it.'],
+    // From react-native-accessibility-engine's tests: a non-adjustable role replaces the native slider's behavior.
+    ['native slider with role="button"', <Slider minimumValue={1} maximumValue={10} accessibilityRole="button" />, 'Slider has the role "button", which replaces its native adjustable behavior.'],
+  ])('flags %s', async (_, el, message) => {
+    await render(el);
+    expect(audit(screen.container).filter((v) => v.ruleId === rule).map((v) => v.message)).toEqual([message]);
+  });
+
+  test.each([
+    ['accessibilityRole="adjustable"', <Stepper accessibilityRole="adjustable" />],
+    ['role="slider"', <Stepper role="slider" />],
+    ['role="spinbutton"', <Stepper role="spinbutton" />],
+    ['other custom actions', <Stepper accessibilityActions={[{ name: 'activate' }, { name: 'delete', label: 'Remove' }]} />],
+    ['native slider with role="adjustable"', <Slider minimumValue={1} maximumValue={10} accessibilityRole="adjustable" />],
+    // react-native-accessibility-engine flagged this, but UISlider and SeekBar are adjustable natively.
+    ['native slider without a role', <Slider minimumValue={1} maximumValue={10} />],
+  ])('passes %s', async (_, el) => {
+    expect(await violations(el, rule)).toEqual([]);
+  });
+
+  test('state-required does not ask native sliders for a value', async () => {
+    const el = <Slider minimumValue={1} maximumValue={10} accessibilityRole="adjustable" />;
+    expect(await violations(el, 'state-required')).toEqual([]);
+  });
+
+  test('a fully accessible stepper passes every rule', async () => {
+    expect(await violations(<Stepper accessibilityRole="adjustable" />)).toEqual([]);
   });
 });

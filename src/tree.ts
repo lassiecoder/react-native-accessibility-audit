@@ -8,6 +8,8 @@ import type { HostNode } from './types';
 const IMAGE_TYPES = new Set(['Image', 'RCTImageView']);
 const TEXT_TYPES = new Set(['Text', 'RCTText', 'RCTVirtualText']);
 const SWITCH_TYPES = new Set(['RCTSwitch', 'AndroidSwitch']);
+// @react-native-community/slider, and React Native's own slider before it moved out.
+const SLIDER_TYPES = new Set(['RNCSlider', 'RCTSlider']);
 
 export function isHostNode(value: unknown): value is HostNode {
   return (
@@ -29,6 +31,18 @@ export function isText(node: HostNode): boolean {
 
 export function isSwitch(node: HostNode): boolean {
   return SWITCH_TYPES.has(node.type);
+}
+
+/** Platform sliders (UISlider / SeekBar), which are adjustable natively. */
+export function isNativeSlider(node: HostNode): boolean {
+  return SLIDER_TYPES.has(node.type);
+}
+
+/** Names of the custom accessibility actions the element exposes. */
+export function getActionNames(node: HostNode): string[] {
+  const actions = node.props.accessibilityActions;
+  if (!Array.isArray(actions)) return [];
+  return actions.map((a: { name?: unknown }) => a?.name).filter((n): n is string => typeof n === 'string');
 }
 
 export function flattenStyle(style: unknown): Record<string, any> {

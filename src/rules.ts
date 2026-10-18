@@ -3,6 +3,7 @@ import {
   findAncestor,
   flattenStyle,
   getAccessibleName,
+  getActionNames,
   getOwnLabel,
   getRole,
   getState,
@@ -10,6 +11,7 @@ import {
   getValue,
   isImage,
   isInteractive,
+  isNativeSlider,
   isSwitch,
   isText,
 } from './tree';
@@ -99,8 +101,8 @@ const stateRequired: Rule = {
   description: 'Checkable and adjustable controls must expose their current state.',
   help: 'Set accessibilityState={{ checked }} (or aria-checked) on checkboxes, radios, switches and toggle buttons; set accessibilityValue (or aria-valuenow / aria-valuetext) on adjustable controls.',
   check(node) {
-    // Native switches report their own value.
-    if (isSwitch(node)) return null;
+    // Native switches and sliders report their own value.
+    if (isSwitch(node) || isNativeSlider(node)) return null;
     const role = getRole(node);
     if (!role) return null;
     if (CHECKABLE_ROLES.has(role)) {
@@ -115,6 +117,24 @@ const stateRequired: Rule = {
         : `Element with role "${role}" does not expose a current value.`;
     }
     return null;
+  },
+};
+
+const adjustableRoleRequired: Rule = {
+  id: 'adjustable-role-required',
+  severity: 'error',
+  description: 'Controls that can be incremented or decremented must have an adjustable role.',
+  help: 'Set accessibilityRole="adjustable" (or role="slider"). VoiceOver only offers swipe up/down for increment and decrement on adjustable elements. Native sliders need no role; remove any other role you set on them.',
+  check(node) {
+    const role = getRole(node);
+    if (role && ADJUSTABLE_ROLES.has(role)) return null;
+    if (isNativeSlider(node)) {
+      // Adjustable natively; only an explicit other role breaks that.
+      return role ? `Slider has the role "${role}", which replaces its native adjustable behavior.` : null;
+    }
+    const adjustable = getActionNames(node).filter((n) => n === 'increment' || n === 'decrement');
+    if (adjustable.length === 0) return null;
+    return `Element exposes the ${adjustable.map((n) => `"${n}"`).join(' and ')} action${adjustable.length > 1 ? 's' : ''} but ${role ? `has the role "${role}"` : 'has no role'}, so screen reader users can't adjust it.`;
   },
 };
 
@@ -216,6 +236,7 @@ export const rules: Rule[] = [
   imageLabelRequired,
   noNestedInteractive,
   stateRequired,
+  adjustableRoleRequired,
   linkRoleMisused,
   noEmptyText,
   touchTargetSize,
