@@ -41,7 +41,31 @@ export interface Violation {
   element: HostNode;
 }
 
+export type Matcher = string | RegExp;
+
+/**
+ * Parts of the tree to skip entirely, e.g. third-party components you can't
+ * change. A matching element and everything inside it is not audited.
+ */
+export interface IgnoreOptions {
+  /** Elements with a matching testID. */
+  testIDs?: Matcher[];
+  /** Elements rendered directly by a matching component, e.g. 'MapView'. */
+  components?: Matcher[];
+  /** Custom predicate for anything the other options can't express. */
+  elements?: (node: HostNode) => boolean;
+}
+
 export interface AuditOptions {
   /** Override severity per rule, or turn a rule off. */
   rules?: Partial<Record<RuleId, RuleSetting>>;
+  ignore?: IgnoreOptions;
+}
+
+export interface MatcherOptions extends AuditOptions {
+  /**
+   * Compare against recorded violations and fail only on new ones.
+   * A string names the baseline; `true` uses the current test's name.
+   */
+  baseline?: string | true;
 }

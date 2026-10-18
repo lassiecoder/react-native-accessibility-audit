@@ -1,0 +1,10 @@
+{
+  "broken-login": {
+    "image-label-required: <Image> in BrokenLoginScreen": 1,
+    "interactive-label-required: Pressable → <View> in BrokenLoginScreen": 1,
+    "interactive-role-required: Pressable → <View> in BrokenLoginScreen": 1,
+    "no-empty-text: <Text> in BrokenLoginScreen": 1,
+    "no-nested-interactive: Pressable → <View> role=\"button\" name=\"Continue\" in BrokenLoginScreen": 1,
+    "state-required: Pressable → <View> role=\"checkbox\" name=\"Remember me\" in BrokenLoginScreen": 1
+  }
+}

@@ -151,11 +151,21 @@ export function findAncestor(
   return null;
 }
 
-/** Depth-first walk over host nodes, skipping subtrees hidden from screen readers. */
-export function walk(root: HostNode, visit: (node: HostNode) => void): void {
-  if (root.type !== '' && isHiddenFromA11y(root)) return;
-  if (root.type !== '') visit(root);
+/**
+ * Depth-first walk over host nodes, skipping subtrees hidden from screen
+ * readers and subtrees for which `skip` returns true.
+ */
+export function walk(
+  root: HostNode,
+  visit: (node: HostNode) => void,
+  skip: (node: HostNode) => boolean = () => false,
+): void {
+  // The container (type '') is never audited itself.
+  if (root.type !== '') {
+    if (isHiddenFromA11y(root) || skip(root)) return;
+    visit(root);
+  }
   for (const child of root.children) {
-    if (typeof child !== 'string') walk(child, visit);
+    if (typeof child !== 'string') walk(child, visit, skip);
   }
 }

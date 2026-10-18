@@ -1,12 +1,23 @@
 import { toBeAccessible } from './matcher';
-import type { AuditOptions } from './types';
+import type { MatcherOptions } from './types';
 
 export { audit } from './audit';
 export { configure, resetConfig } from './config';
 export { formatViolations } from './format';
 export { rules } from './rules';
 export { toBeAccessible };
-export type { AuditOptions, HostNode, Rule, RuleId, RuleSetting, Severity, Violation } from './types';
+export type {
+  AuditOptions,
+  HostNode,
+  IgnoreOptions,
+  Matcher,
+  MatcherOptions,
+  Rule,
+  RuleId,
+  RuleSetting,
+  Severity,
+  Violation,
+} from './types';
 
 // Importing the package (or listing it in setupFilesAfterEnv) registers the
 // matcher, matching react-native-accessibility-engine's setup.
@@ -20,7 +31,7 @@ declare global {
   namespace jest {
     interface Matchers<R> {
       /** Fails when the rendered element has accessibility violations. */
-      toBeAccessible(options?: AuditOptions): R;
+      toBeAccessible(options?: MatcherOptions): R;
     }
   }
 }
