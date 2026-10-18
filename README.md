@@ -27,6 +27,7 @@ test('login screen is accessible', async () => {
 - [Project reports and CLI](#project-reports-and-cli)
 - [Limitations](#limitations)
 - [Migrating from react-native-accessibility-engine](#migrating-from-react-native-accessibility-engine)
+- [Versioning](#versioning)
 - [Contributing](#contributing)
 
 ## Requirements
@@ -343,6 +344,19 @@ For most projects it's a dependency swap:
 `toBeAccessible()`, passing React elements, the `rules` array, the old rule IDs, `customViolationHandler` and the `__A11Y_RULES__` / `__CUSTOM_VIOLATION_HANDLER__` globals all still work. You'll need React 19 and React Native Testing Library v14. The new rules find more issues than the old ones; use [baseline mode](#baseline-mode) to adopt them gradually.
 
 See the full [migration guide](docs/migration.md).
+
+## Versioning
+
+The package follows [Semantic Versioning](https://semver.org/). It's in initial development (`0.x`), and npm's default `^` range keeps you on the same minor version: `^0.1.0` installs `0.1.x` updates but not `0.2.0`.
+
+For an accessibility checker, a release that finds more problems can fail tests that passed before. So changes are released like this:
+
+| Release | Contains | Can a passing test start failing? |
+| --- | --- | --- |
+| Patch (`0.1.x`) | Bug fixes, fewer false positives, clearer messages, docs | No |
+| Minor (`0.x.0`) | New rules, stricter rules, changed defaults, API changes, baseline or report format changes, dropped React / React Native / Jest / Node versions | Yes. Read the changelog before upgrading. |
+
+Baselines are part of that contract: a change to how violations are identified would invalidate every recorded baseline, so it only happens in a minor release and is called out in the [changelog](CHANGELOG.md). Version 1.0.0 will follow once the rules and options have settled with real-world use. From then on, changes that can fail a passing test will be major releases.
 
 ## Contributing
 

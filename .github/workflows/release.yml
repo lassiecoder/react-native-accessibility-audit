@@ -1,0 +1,44 @@
+name: Release
+
+# Publishes to npm when a version tag (created by `npm version`) is pushed.
+# Uses npm trusted publishing (OIDC): no npm token is stored in the repository,
+# and npm attaches a provenance attestation. See RELEASING.md for the one-time
+# setup on npmjs.com, which needs the first version to be published by hand.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # trusted publishing needs npm >= 11.5.1
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Check the tag matches package.json
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json $version" >&2
+            exit 1
+          fi
+      - run: npm ci # also builds dist/ through `prepare`
+      # prepublishOnly runs the typecheck and tests again before publishing.
+      - name: Publish
+        run: |
+          if node -p "require('./package.json').version" | grep -q -- '-'; then
+            npm publish --tag next
+          else
+            npm publish
+          fi

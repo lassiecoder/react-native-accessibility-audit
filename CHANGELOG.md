@@ -1,8 +1,10 @@
 # Changelog
 
+All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/) as described in [Versioning](README.md#versioning).
+
 ## Unreleased
 
-First release. Not yet published to npm.
+First release, planned as 0.1.0.
 
 ### Matcher
 

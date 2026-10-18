@@ -39,7 +39,10 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "preversion": "node scripts/stamp-changelog.mjs --check && npm run typecheck && npm test -- --ci && npm run build",
+    "version": "node scripts/stamp-changelog.mjs && git add CHANGELOG.md",
+    "prepublishOnly": "npm run typecheck && npm test -- --ci"
   },
   "engines": {
     "node": "^22.13.0 || >=24"
