@@ -10,6 +10,8 @@ const TEXT_TYPES = new Set(['Text', 'RCTText', 'RCTVirtualText']);
 const SWITCH_TYPES = new Set(['RCTSwitch', 'AndroidSwitch']);
 // @react-native-community/slider, and React Native's own slider before it moved out.
 const SLIDER_TYPES = new Set(['RNCSlider', 'RCTSlider']);
+// 'TextInput' in Jest presets; the others are the native host names.
+const TEXT_INPUT_TYPES = new Set(['TextInput', 'RCTSinglelineTextInputView', 'RCTMultilineTextInputView', 'AndroidTextInput']);
 
 export function isHostNode(value: unknown): value is HostNode {
   return (
@@ -31,6 +33,10 @@ export function isText(node: HostNode): boolean {
 
 export function isSwitch(node: HostNode): boolean {
   return SWITCH_TYPES.has(node.type);
+}
+
+export function isTextInput(node: HostNode): boolean {
+  return TEXT_INPUT_TYPES.has(node.type);
 }
 
 /** Platform sliders (UISlider / SeekBar), which are adjustable natively. */
@@ -89,10 +95,18 @@ export function getOwnLabel(node: HostNode): string | undefined {
   return (
     nonEmpty(props['aria-label']) ??
     nonEmpty(props.accessibilityLabel) ??
-    (isImage(node) ? nonEmpty(props.alt) : undefined) ??
-    nonEmpty(props['aria-labelledby']) ??
-    nonEmpty(props.accessibilityLabelledBy)
+    (isImage(node) ? nonEmpty(props.alt) : undefined)
   );
+}
+
+/**
+ * aria-labelledby / accessibilityLabelledBy are Android-only in React Native,
+ * so they don't count as a label; rules use this to explain why.
+ */
+export function hasAndroidOnlyLabel(node: HostNode): boolean {
+  const { props } = node;
+  const ids = [props['aria-labelledby'], props.accessibilityLabelledBy].flat();
+  return ids.some((id) => nonEmpty(id) !== undefined);
 }
 
 /** Visible text in the subtree, skipping parts hidden from screen readers. */

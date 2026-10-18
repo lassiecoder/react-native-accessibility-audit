@@ -1,6 +1,7 @@
 {
   "broken-login": {
     "image-label-required: <Image> in BrokenLoginScreen": 1,
+    "input-label-required: <TextInput> in BrokenLoginScreen": 1,
     "interactive-label-required: Pressable → <View> in BrokenLoginScreen": 1,
     "interactive-role-required: Pressable → <View> in BrokenLoginScreen": 1,
     "no-empty-text: <Text> in BrokenLoginScreen": 1,

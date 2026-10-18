@@ -6,6 +6,7 @@ Elements hidden from screen readers (`aria-hidden`, `accessibilityElementsHidden
 
 - [interactive-role-required](#interactive-role-required)
 - [interactive-label-required](#interactive-label-required)
+- [input-label-required](#input-label-required)
 - [interactive-accessible-required](#interactive-accessible-required)
 - [image-label-required](#image-label-required)
 - [no-nested-interactive](#no-nested-interactive)
@@ -63,7 +64,37 @@ A control needs a name for the screen reader to read. If it has visible text, th
 <Switch value={wifi} onValueChange={setWifi} accessibilityLabel="Wi-Fi" />
 ```
 
-The name comes from `aria-label`, `accessibilityLabel`, `aria-labelledby` / `accessibilityLabelledBy`, or else the text and labels of the element's children. Whitespace-only labels don't count, and neither does text hidden from screen readers.
+The name comes from `aria-label` or `accessibilityLabel`, or else the text and labels of the element's children. Whitespace-only labels don't count, and neither does text hidden from screen readers.
+
+`aria-labelledby` / `accessibilityLabelledBy` don't count: React Native supports them only on Android, so on iOS the element would have no name. Use them together with `accessibilityLabel` if you want both.
+
+## input-label-required
+
+**Default: error.**
+
+Text inputs and sliders need a label that says what they're for. A visible `Text` next to the field isn't connected to it, so the screen reader doesn't read it when the field is focused. A placeholder isn't a label either: it disappears as soon as someone types.
+
+```tsx
+// ✗ Visible label, but not connected
+<Text>Email</Text>
+<TextInput />
+
+// ✗ Placeholder only
+<TextInput placeholder="Email" />
+
+// ✗ Android only
+<Text nativeID="email-label">Email</Text>
+<TextInput accessibilityLabelledBy="email-label" />
+
+// ✓
+<Text>Email</Text>
+<TextInput accessibilityLabel="Email" placeholder="you@example.com" />
+<Slider minimumValue={0} maximumValue={100} accessibilityLabel="Volume" />
+```
+
+The label comes from `accessibilityLabel` or `aria-label`. `accessibilityLabelledBy` / `aria-labelledby` work only on Android, so on their own they're reported. Combine them with `accessibilityLabel`.
+
+Checks `TextInput` (single and multi-line) and `Slider` from `@react-native-community/slider`. `Switch` is checked by [interactive-label-required](#interactive-label-required).
 
 ## interactive-accessible-required
 

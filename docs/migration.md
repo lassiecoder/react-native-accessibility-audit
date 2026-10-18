@@ -70,11 +70,12 @@ Because several old IDs map to one new rule, enabling one of them enables the wh
 
 The new rules catch issues the old engine didn't:
 
+- `input-label-required`: text inputs and sliders without a label, including inputs that only have a placeholder
 - `image-label-required`: images that are neither labelled nor marked decorative
 - `no-nested-interactive`: buttons inside buttons
 - `touch-target-size` and `text-contrast`: printed as warnings, don't fail tests
 
-Detection is also broader. Any element that handles presses is checked, not only the components the old engine recognized by name.
+Detection is also broader. Any element that handles presses is checked, not only the components the old engine recognized by name. And `aria-labelledby` / `accessibilityLabelledBy` alone no longer count as a label, because React Native supports them only on Android.
 
 If switching produces a wall of failures, use baseline mode on the affected tests. It records today's violations and fails only on new ones:
 

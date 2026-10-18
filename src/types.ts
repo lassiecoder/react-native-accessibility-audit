@@ -17,6 +17,7 @@ export type RuleSetting = Severity | 'off';
 export type RuleId =
   | 'interactive-role-required'
   | 'interactive-label-required'
+  | 'input-label-required'
   | 'interactive-accessible-required'
   | 'image-label-required'
   | 'no-nested-interactive'

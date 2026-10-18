@@ -33,6 +33,8 @@ export function BrokenLoginScreen({ onSubmit }: Props) {
       {/* image without a label that is not hidden */}
       <Image source={require('../../assets/icon.png')} style={styles.logo} />
       <Text style={styles.title}>Sign in</Text>
+      {/* placeholder is not a label */}
+      <TextInput placeholder="Email" style={styles.input} />
       {/* empty text node */}
       <Text />
       {/* icon-only pressable: no role, no label, no text, too small */}

@@ -9,11 +9,13 @@ import {
   getState,
   getTextContent,
   getValue,
+  hasAndroidOnlyLabel,
   isImage,
   isInteractive,
   isNativeSlider,
   isSwitch,
   isText,
+  isTextInput,
 } from './tree';
 import type { HostNode, Rule, RuleId } from './types';
 
@@ -22,6 +24,8 @@ import type { HostNode, Rule, RuleId } from './types';
 const NON_INTERACTIVE_ROLES = new Set(['none', 'presentation', 'text', 'header', 'heading', 'image', 'img', 'summary']);
 const CHECKABLE_ROLES = new Set(['checkbox', 'radio', 'switch', 'togglebutton']);
 const ADJUSTABLE_ROLES = new Set(['adjustable', 'slider', 'spinbutton']);
+
+const ANDROID_ONLY_NOTE = ' aria-labelledby / accessibilityLabelledBy only work on Android, so iOS has no label.';
 
 const interactiveRoleRequired: Rule = {
   id: 'interactive-role-required',
@@ -36,6 +40,22 @@ const interactiveRoleRequired: Rule = {
       return `Interactive element has the non-interactive role "${role}".`;
     }
     return null;
+  },
+};
+
+const inputLabelRequired: Rule = {
+  id: 'input-label-required',
+  severity: 'error',
+  description: 'Text inputs and sliders must have a label.',
+  help: 'Add accessibilityLabel (or aria-label) describing the field, usually the same text as its visible label. A placeholder is not a label: it disappears once someone types.',
+  check(node) {
+    const input = isTextInput(node) ? 'Text input' : isNativeSlider(node) ? 'Slider' : null;
+    if (!input || getOwnLabel(node)) return null;
+    if (hasAndroidOnlyLabel(node)) return `${input} has no label.${ANDROID_ONLY_NOTE}`;
+    if (isTextInput(node) && typeof node.props.placeholder === 'string' && node.props.placeholder.trim()) {
+      return `Text input has only a placeholder ("${node.props.placeholder.trim()}"). Placeholders disappear once someone types, so they aren't a reliable label.`;
+    }
+    return `${input} has no label, so screen readers can't say what it is for.`;
   },
 };
 
@@ -59,9 +79,8 @@ const interactiveLabelRequired: Rule = {
   help: 'Add accessibilityLabel (or aria-label), or render visible Text inside the element.',
   check(node) {
     if (!isInteractive(node)) return null;
-    return getAccessibleName(node)
-      ? null
-      : 'Interactive element has no label or text, so screen readers can only announce its role.';
+    if (getAccessibleName(node)) return null;
+    return `Interactive element has no label or text, so screen readers can only announce its role.${hasAndroidOnlyLabel(node) ? ANDROID_ONLY_NOTE : ''}`;
   },
 };
 
@@ -232,6 +251,7 @@ const textContrast: Rule = {
 export const rules: Rule[] = [
   interactiveRoleRequired,
   interactiveLabelRequired,
+  inputLabelRequired,
   interactiveAccessibleRequired,
   imageLabelRequired,
   noNestedInteractive,

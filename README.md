@@ -123,6 +123,7 @@ Errors fail the test. Warnings are printed but don't fail it, because they depen
 | --- | --- | --- |
 | [interactive-role-required](docs/rules.md#interactive-role-required) | error | pressable elements have an interactive role such as `button` or `link` |
 | [interactive-label-required](docs/rules.md#interactive-label-required) | error | pressable elements have a label or visible text |
+| [input-label-required](docs/rules.md#input-label-required) | error | text inputs and sliders have a label (a placeholder isn't one) |
 | [interactive-accessible-required](docs/rules.md#interactive-accessible-required) | error | pressable elements aren't hidden from screen readers with `accessible={false}` |
 | [image-label-required](docs/rules.md#image-label-required) | error | images have a label or are marked as decorative |
 | [no-nested-interactive](docs/rules.md#no-nested-interactive) | error | pressable elements aren't nested inside other pressable elements |

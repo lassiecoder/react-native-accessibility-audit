@@ -5,6 +5,7 @@ import {
   Pressable,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   type ViewProps,
@@ -56,6 +57,7 @@ describe('interactive-label-required', () => {
     ['empty Pressable', <Pressable onPress={noop} accessibilityRole="button" />],
     ['icon with unlabelled image', <Pressable onPress={noop} accessibilityRole="button"><Image source={img} /></Pressable>],
     ['whitespace label', <Pressable onPress={noop} accessibilityRole="button" accessibilityLabel="  " />],
+    ['aria-labelledby only (Android-only)', <Pressable onPress={noop} accessibilityRole="button" aria-labelledby="close-label" />],
     ['Switch without label', <Switch value onValueChange={noop} />],
     ['only hidden text', (
       <Pressable onPress={noop} accessibilityRole="button">
@@ -74,6 +76,49 @@ describe('interactive-label-required', () => {
     ['deep text', <Pressable onPress={noop} accessibilityRole="button"><View><Text>Go</Text></View></Pressable>],
   ])('passes %s', async (_, el) => {
     expect(await violations(el, rule)).toEqual([]);
+  });
+});
+
+describe('input-label-required', () => {
+  const rule = 'input-label-required';
+
+  async function messages(el: React.ReactElement) {
+    await render(el);
+    return audit(screen.container).filter((v) => v.ruleId === rule).map((v) => v.message);
+  }
+
+  test.each([
+    ['unlabelled TextInput', <TextInput />, "Text input has no label, so screen readers can't say what it is for."],
+    ['placeholder only', <TextInput placeholder="  Email " />, 'Text input has only a placeholder ("Email"). Placeholders disappear once someone types, so they aren\'t a reliable label.'],
+    ['labelledby only (Android-only)', <TextInput accessibilityLabelledBy="email-label" />, 'Text input has no label. aria-labelledby / accessibilityLabelledBy only work on Android, so iOS has no label.'],
+    ['unlabelled Slider', <Slider minimumValue={0} maximumValue={1} />, "Slider has no label, so screen readers can't say what it is for."],
+  ])('flags %s', async (_, el, message) => {
+    expect(await messages(el)).toEqual([message]);
+  });
+
+  test.each([
+    ['accessibilityLabel', <TextInput accessibilityLabel="Email" placeholder="you@example.com" />],
+    ['aria-label', <TextInput aria-label="Search" />],
+    ['multiline', <TextInput multiline accessibilityLabel="Message" />],
+    ['labelledby plus label', (
+      <View>
+        <Text nativeID="email-label">Email</Text>
+        <TextInput accessibilityLabelledBy="email-label" accessibilityLabel="Email" />
+      </View>
+    )],
+    ['labelled Slider', <Slider minimumValue={0} maximumValue={1} accessibilityLabel="Volume" />],
+    ['hidden input', <View aria-hidden><TextInput /></View>],
+  ])('passes %s', async (_, el) => {
+    expect(await messages(el)).toEqual([]);
+  });
+
+  test('a visible label next to the input is not enough on its own', async () => {
+    expect(await messages(
+      <View>
+        <Text>Email</Text>
+        <TextInput />
+      </View>,
+    )).toHaveLength(1);
   });
 });
 
@@ -352,4 +397,10 @@ describe('adjustable-role-required', () => {
   test('a fully accessible stepper passes every rule', async () => {
     expect(await violations(<Stepper accessibilityRole="adjustable" />)).toEqual([]);
   });
+});
+
+test('interactive-label-required explains Android-only labels', async () => {
+  await render(<Pressable onPress={noop} accessibilityRole="button" accessibilityLabelledBy={['a', 'b']} />);
+  const [violation] = audit(screen.container).filter((v) => v.ruleId === 'interactive-label-required');
+  expect(violation.message).toContain('only work on Android');
 });
