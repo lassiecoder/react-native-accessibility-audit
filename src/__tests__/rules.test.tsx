@@ -129,13 +129,21 @@ describe('image-label-required', () => {
     expect(await violations(<Image source={img} />, rule)).toEqual([rule]);
   });
 
+  test('flags importantForAccessibility="no" alone, which only works on Android', async () => {
+    await render(<Image source={img} importantForAccessibility="no" />);
+    expect(audit(screen.container).filter((v) => v.ruleId === rule).map((v) => v.message)).toEqual([
+      'Image is marked decorative with importantForAccessibility="no", which only applies on Android.',
+    ]);
+  });
+
   test.each([
     ['accessibilityLabel', <Image source={img} accessibilityLabel="Logo" />],
     ['alt', <Image source={img} alt="Logo" />],
     ['alt="" (decorative)', <Image source={img} alt="" />],
     ['aria-hidden', <Image source={img} aria-hidden />],
     ['hidden ancestor', <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Image source={img} /></View>],
-    ['importantForAccessibility="no"', <Image source={img} importantForAccessibility="no" />],
+    ['accessible={false}', <Image source={img} accessible={false} />],
+    ['importantForAccessibility="no" with accessibilityElementsHidden', <Image source={img} importantForAccessibility="no" accessibilityElementsHidden />],
     ['inside accessible container', <View accessible accessibilityLabel="Profile"><Image source={img} /></View>],
   ])('passes %s', async (_, el) => {
     expect(await violations(el, rule)).toEqual([]);
@@ -403,4 +411,248 @@ test('interactive-label-required explains Android-only labels', async () => {
   await render(<Pressable onPress={noop} accessibilityRole="button" accessibilityLabelledBy={['a', 'b']} />);
   const [violation] = audit(screen.container).filter((v) => v.ruleId === 'interactive-label-required');
   expect(violation.message).toContain('only work on Android');
+});
+
+async function messagesFor(el: React.ReactElement, rule: RuleId) {
+  await render(el);
+  return audit(screen.container).filter((v) => v.ruleId === rule).map((v) => v.message);
+}
+
+describe('consistent-hiding', () => {
+  const rule = 'consistent-hiding';
+
+  test.each([
+    ['accessibilityElementsHidden only', <View accessibilityElementsHidden><Text>Promo</Text></View>, 'Element is hidden from VoiceOver with accessibilityElementsHidden, but TalkBack still reads it.'],
+    ['importantForAccessibility only', <View importantForAccessibility="no-hide-descendants"><Text>Promo</Text></View>, 'Element is hidden from TalkBack with importantForAccessibility="no-hide-descendants", but VoiceOver still reads it.'],
+  ])('flags %s', async (_, el, message) => {
+    expect(await messagesFor(el, rule)).toEqual([message]);
+  });
+
+  test.each([
+    ['aria-hidden', <View aria-hidden><Text>Promo</Text></View>],
+    ['both platform props', <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Text>Promo</Text></View>],
+    ['other platform covered by an ancestor', (
+      <View importantForAccessibility="no-hide-descendants">
+        <View accessibilityElementsHidden><Text>Promo</Text></View>
+      </View>
+    )],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, rule)).toEqual([]);
+  });
+
+  test('content hidden on one platform is still audited', async () => {
+    const result = await violations(
+      <View accessibilityElementsHidden>
+        <Pressable onPress={noop} />
+      </View>,
+    );
+    expect(result).toEqual(expect.arrayContaining(['interactive-role-required', 'interactive-label-required']));
+  });
+
+  test('text hidden on one platform does not count as a name', async () => {
+    const el = (
+      <Pressable onPress={noop} accessibilityRole="button">
+        <Text accessibilityElementsHidden>Go</Text>
+      </Pressable>
+    );
+    expect(await violations(el, 'interactive-label-required')).toEqual(['interactive-label-required']);
+  });
+});
+
+describe('modal-hides-background', () => {
+  const rule = 'modal-hides-background';
+  const dialog = (props: ViewProps = {}) => (
+    <View aria-modal accessibilityLabel="Confirm" {...props}>
+      <Text>Delete this item?</Text>
+    </View>
+  );
+
+  test('flags readable siblings, which TalkBack still reads', async () => {
+    const [message] = await messagesFor(
+      <View>
+        <Text>Inbox</Text>
+        {dialog()}
+      </View>,
+      rule,
+    );
+    expect(message).toMatch(/^aria-modal \/ accessibilityViewIsModal only work on iOS, so TalkBack still reads/);
+    expect(message).toContain('<Text> name="Inbox"');
+  });
+
+  test('flags an interactive backdrop', async () => {
+    const result = await messagesFor(
+      <View>
+        <Pressable onPress={noop} accessibilityRole="button" accessibilityLabel="Close" />
+        {dialog({ accessibilityViewIsModal: true, 'aria-modal': undefined })}
+      </View>,
+      rule,
+    );
+    expect(result).toHaveLength(1);
+  });
+
+  test('flags content that is not a direct sibling, which iOS also reads', async () => {
+    const [message] = await messagesFor(
+      <View>
+        <Text>Header</Text>
+        <View>{dialog()}</View>
+      </View>,
+      rule,
+    );
+    expect(message).toMatch(/^Content outside the modal is still read by VoiceOver and TalkBack/);
+  });
+
+  test.each([
+    ['background hidden for Android', (
+      <View>
+        <View importantForAccessibility="no-hide-descendants"><Text>Inbox</Text></View>
+        {dialog()}
+      </View>
+    )],
+    ['background aria-hidden', (
+      <View>
+        <View aria-hidden><Text>Inbox</Text></View>
+        {dialog()}
+      </View>
+    )],
+    ['empty backdrop', (
+      <View>
+        <View style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
+        {dialog()}
+      </View>
+    )],
+    ['modal rendered alone', dialog()],
+    ['no aria-modal', <View><Text>Inbox</Text><View><Text>Panel</Text></View></View>],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, rule)).toEqual([]);
+  });
+});
+
+describe('no-disabled-font-scaling', () => {
+  const rule = 'no-disabled-font-scaling';
+
+  test.each([
+    ['Text allowFontScaling={false}', <Text allowFontScaling={false}>Price</Text>, "Text has allowFontScaling={false}, so it ignores the user's text size setting."],
+    ['TextInput allowFontScaling={false}', <TextInput accessibilityLabel="Name" allowFontScaling={false} />, "Text input has allowFontScaling={false}, so it ignores the user's text size setting."],
+    ['maxFontSizeMultiplier={1}', <Text maxFontSizeMultiplier={1}>Price</Text>, "Text has maxFontSizeMultiplier={1}, so it can't grow beyond its base size."],
+  ])('flags %s', async (_, el, message) => {
+    expect(await messagesFor(el, rule)).toEqual([message]);
+  });
+
+  test.each([
+    ['default', <Text>Price</Text>],
+    ['maxFontSizeMultiplier={0} (no limit)', <Text maxFontSizeMultiplier={0}>Price</Text>],
+    ['maxFontSizeMultiplier={1.5}', <Text maxFontSizeMultiplier={1.5}>Price</Text>],
+    ['maxFontSizeMultiplier={2}', <Text maxFontSizeMultiplier={2}>Price</Text>],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, rule)).toEqual([]);
+  });
+});
+
+describe('accessibility-actions-valid', () => {
+  const rule = 'accessibility-actions-valid';
+  const row = (props: ViewProps) => <View accessible accessibilityLabel="Message from Sam" {...props} />;
+
+  test.each([
+    ['no handler', row({ accessibilityActions: [{ name: 'activate' }] }), 'Accessibility actions are broken: there is no onAccessibilityAction handler, so activating an action does nothing.'],
+    ['custom action without label', row({ accessibilityActions: [{ name: 'archive' }, { name: 'activate' }], onAccessibilityAction: noop }), 'Accessibility actions are broken: custom action "archive" has no label to announce.'],
+    ['several problems', row({ accessibilityActions: [{ name: '' }, { name: 'pin' }, { name: 'mute' }] }), 'Accessibility actions are broken: an action has no name; custom actions "pin", "mute" have no label to announce; there is no onAccessibilityAction handler, so activating an action does nothing.'],
+  ])('flags %s', async (_, el, message) => {
+    expect(await messagesFor(el, rule)).toEqual([message]);
+  });
+
+  test.each([
+    ['standard actions with handler', row({ accessibilityActions: [{ name: 'activate' }, { name: 'magicTap' }], onAccessibilityAction: noop })],
+    ['labelled custom action', row({ accessibilityActions: [{ name: 'archive', label: 'Archive' }], onAccessibilityAction: noop })],
+    ['no actions', row({})],
+    ['native slider', <Slider minimumValue={0} maximumValue={1} accessibilityLabel="Volume" accessibilityActions={[{ name: 'increment' }]} />],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, rule)).toEqual([]);
+  });
+});
+
+describe('role-valid', () => {
+  const rule = 'role-valid';
+
+  test.each([
+    ['ARIA name in accessibilityRole', <Text accessibilityRole={'heading' as never}>Title</Text>, 'accessibilityRole="heading" is not a role React Native supports. It is a valid value for role; use role="heading" instead.'],
+    ['React Native name in role', <Text role={'header' as never}>Title</Text>, 'role="header" is not a role React Native supports. It is a valid value for accessibilityRole; use accessibilityRole="header" instead.'],
+    ['typo', <Pressable onPress={noop} accessibilityRole={'buton' as never}><Text>Go</Text></Pressable>, 'accessibilityRole="buton" is not a role React Native supports.'],
+  ])('flags %s', async (_, el, message) => {
+    expect(await messagesFor(el, rule)).toEqual([message]);
+  });
+
+  test.each([
+    ['accessibilityRole="header"', <Text accessibilityRole="header">Title</Text>],
+    ['role="heading"', <Text role="heading">Title</Text>],
+    ['role="dialog"', <View role="dialog" />],
+    ['accessibilityRole="tabbar"', <View accessibilityRole="tabbar" />],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, rule)).toEqual([]);
+  });
+});
+
+describe('no-nested-interactive inside accessible groups', () => {
+  test('flags a control inside an accessible={true} View', async () => {
+    const result = await messagesFor(
+      <View accessible accessibilityLabel="Order 1234">
+        <Text>Order 1234</Text>
+        <Pressable onPress={noop} accessibilityRole="button"><Text>Track</Text></Pressable>
+      </View>,
+      'no-nested-interactive',
+    );
+    expect(result).toEqual([
+      'Interactive element is inside an accessible={true} container, which VoiceOver focuses as a single element, so this control cannot be reached on iOS.',
+    ]);
+  });
+
+  test('passes an accessible group without controls', async () => {
+    const el = <View accessible><Text>Order 1234</Text><Text>Shipped</Text></View>;
+    expect(await messagesFor(el, 'no-nested-interactive')).toEqual([]);
+  });
+});
+
+describe('text-contrast for inputs', () => {
+  const field = (props: object) => (
+    <View style={{ backgroundColor: '#fff' }}>
+      <TextInput accessibilityLabel="Email" placeholder="you@example.com" {...props} />
+    </View>
+  );
+
+  test('flags a faint placeholder', async () => {
+    expect(await messagesFor(field({ placeholderTextColor: '#cccccc' }), 'text-contrast')).toEqual([
+      'Placeholder contrast is 1.61:1 (#cccccc on #ffffff), below 4.5:1.',
+    ]);
+  });
+
+  test('flags faint input text', async () => {
+    expect(await messagesFor(field({ style: { color: '#dddddd' } }), 'text-contrast')).toEqual([
+      'Input text contrast is 1.36:1 (#dddddd on #ffffff), below 4.5:1.',
+    ]);
+  });
+
+  test.each([
+    ['readable placeholder', field({ placeholderTextColor: '#757575' })],
+    ['default placeholder color', field({})],
+    ['no placeholder text', field({ placeholder: undefined, placeholderTextColor: '#eeeeee' })],
+  ])('passes %s', async (_, el) => {
+    expect(await messagesFor(el, 'text-contrast')).toEqual([]);
+  });
+});
+
+describe('no-nested-text-link', () => {
+  const rule = 'no-nested-text-link';
+
+  test('warns about a link inside a paragraph', async () => {
+    await render(
+      <Text>
+        Read our <Text role="link" onPress={noop}>terms</Text>.
+      </Text>,
+    );
+    const found = audit(screen.container).filter((v) => v.ruleId === rule);
+    expect(found.map((v) => v.severity)).toEqual(['warn']);
+  });
+
+  test('passes a standalone link', async () => {
+    expect(await messagesFor(<Text role="link" onPress={noop}>Terms</Text>, rule)).toEqual([]);
+  });
 });

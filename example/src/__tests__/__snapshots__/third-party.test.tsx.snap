@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`unlabelled expo-image, symbols and gesture-handler buttons are reported 1`] = `
+"expect(element).toBeAccessible()
+
+Found 6 accessibility violations:
+
+1. [image-label-required] Image has no label and is not marked as decorative.
+   Element: expo-image Image → <ViewManagerAdapter_ExpoImage> in ProfileHeader
+   Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.
+
+2. [image-label-required] Image has no label and is not marked as decorative.
+   Element: expo-symbols SymbolView → <ViewManagerAdapter_SymbolModule> in ProfileHeader
+   Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.
+
+3. [interactive-role-required] Interactive element has no role.
+   Element: gesture-handler RectButton → <RNGestureHandlerButton> in ProfileHeader
+   Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.
+
+4. [interactive-label-required] Interactive element has no label or text, so screen readers can only announce its role.
+   Element: gesture-handler RectButton → <RNGestureHandlerButton> in ProfileHeader
+   Fix: Add accessibilityLabel (or aria-label), or render visible Text inside the element.
+
+5. [interactive-label-required] Interactive element has no label or text, so screen readers can only announce its role.
+   Element: gesture-handler BorderlessButton → <RNGestureHandlerButton> role="button" in ProfileHeader
+   Fix: Add accessibilityLabel (or aria-label), or render visible Text inside the element.
+
+6. [interactive-role-required] Interactive element has no role.
+   Element: gesture-handler Pressable → <RNGestureHandlerButton> name="Share" in ProfileHeader
+   Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does."
+`;

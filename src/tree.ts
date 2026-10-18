@@ -5,13 +5,20 @@ import type { HostNode } from './types';
 // legacy `accessibility*` props; Pressable normalizes some (aria-checked ->
 // accessibilityState) but not others (role stays `role`), so we read both.
 
-const IMAGE_TYPES = new Set(['Image', 'RCTImageView']);
+// expo-image and expo-symbols render as ViewManagerAdapter_* under jest-expo.
+const IMAGE_TYPES = new Set([
+  'Image', 'RCTImageView',
+  'ExpoImage', 'ViewManagerAdapter_ExpoImage',
+  'SymbolModule', 'ViewManagerAdapter_SymbolModule',
+]);
 const TEXT_TYPES = new Set(['Text', 'RCTText', 'RCTVirtualText']);
 const SWITCH_TYPES = new Set(['RCTSwitch', 'AndroidSwitch']);
 // @react-native-community/slider, and React Native's own slider before it moved out.
 const SLIDER_TYPES = new Set(['RNCSlider', 'RCTSlider']);
 // 'TextInput' in Jest presets; the others are the native host names.
 const TEXT_INPUT_TYPES = new Set(['TextInput', 'RCTSinglelineTextInputView', 'RCTMultilineTextInputView', 'AndroidTextInput']);
+// RectButton, BorderlessButton and Pressable from react-native-gesture-handler.
+const GESTURE_BUTTON_TYPES = new Set(['RNGestureHandlerButton']);
 
 export function isHostNode(value: unknown): value is HostNode {
   return (
@@ -39,6 +46,10 @@ export function isTextInput(node: HostNode): boolean {
   return TEXT_INPUT_TYPES.has(node.type);
 }
 
+export function isGestureButton(node: HostNode): boolean {
+  return GESTURE_BUTTON_TYPES.has(node.type);
+}
+
 /** Platform sliders (UISlider / SeekBar), which are adjustable natively. */
 export function isNativeSlider(node: HostNode): boolean {
   return SLIDER_TYPES.has(node.type);
@@ -57,20 +68,38 @@ export function flattenStyle(style: unknown): Record<string, any> {
   return typeof style === 'object' ? (style as Record<string, any>) : {};
 }
 
-/** True when this node and its subtree are removed from the accessibility tree. */
-export function isHiddenFromA11y(node: HostNode): boolean {
+// accessibilityElementsHidden is iOS-only and importantForAccessibility is
+// Android-only; aria-hidden and display: 'none' hide on both.
+
+/** The node's own props hide it and its subtree from VoiceOver. */
+export function hidesOnIOS(node: HostNode): boolean {
+  const { props } = node;
+  return props['aria-hidden'] === true || props.accessibilityElementsHidden === true || flattenStyle(props.style).display === 'none';
+}
+
+/** The node's own props hide it and its subtree from TalkBack. */
+export function hidesOnAndroid(node: HostNode): boolean {
   const { props } = node;
   return (
     props['aria-hidden'] === true ||
-    props.accessibilityElementsHidden === true ||
     props.importantForAccessibility === 'no-hide-descendants' ||
     flattenStyle(props.style).display === 'none'
   );
 }
 
+/** Hidden from screen readers on both platforms by the node's own props. */
+export function isHiddenFromA11y(node: HostNode): boolean {
+  return hidesOnIOS(node) && hidesOnAndroid(node);
+}
+
+/** Hidden on at least one platform, so it can't be relied on as content. */
+function isHiddenOnAnyPlatform(node: HostNode): boolean {
+  return hidesOnIOS(node) || hidesOnAndroid(node);
+}
+
 export function isInteractive(node: HostNode): boolean {
   const { props } = node;
-  if (isSwitch(node)) return true;
+  if (isSwitch(node) || isGestureButton(node)) return true;
   // Pressable and every Touchable* set onClick on their host View;
   // <Text onPress> keeps onPress on the host Text.
   return (
@@ -109,9 +138,12 @@ export function hasAndroidOnlyLabel(node: HostNode): boolean {
   return ids.some((id) => nonEmpty(id) !== undefined);
 }
 
-/** Visible text in the subtree, skipping parts hidden from screen readers. */
+/**
+ * Visible text in the subtree. Text hidden on either platform is skipped:
+ * a name that only one platform can read is missing on the other.
+ */
 export function getTextContent(node: HostNode): string {
-  if (isHiddenFromA11y(node)) return '';
+  if (isHiddenOnAnyPlatform(node)) return '';
   return node.children
     .map((child) => (typeof child === 'string' ? child : getTextContent(child)))
     .join('');
@@ -126,7 +158,7 @@ export function getAccessibleName(node: HostNode): string | undefined {
   if (own) return own;
   const parts: string[] = [];
   const collect = (n: HostNode) => {
-    if (isHiddenFromA11y(n)) return;
+    if (isHiddenOnAnyPlatform(n)) return;
     for (const child of n.children) {
       if (typeof child === 'string') parts.push(child);
       else {
@@ -169,6 +201,32 @@ export function getValue(node: HostNode): { now?: number; text?: string } {
   };
 }
 
+/** First descendant matching `predicate`, depth-first, not descending past `stop`. */
+export function findDescendant(
+  node: HostNode,
+  predicate: (n: HostNode) => boolean,
+  stop: (n: HostNode) => boolean = () => false,
+): HostNode | null {
+  for (const child of node.children) {
+    if (typeof child === 'string') continue;
+    if (predicate(child)) return child;
+    if (stop(child)) continue;
+    const found = findDescendant(child, predicate, stop);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * The element screen readers focus for a control. Gesture-handler buttons
+ * are often made accessible through an accessible child View that carries the
+ * role and label (gesture-handler's documented pattern), not the button itself.
+ */
+export function accessibilityTarget(node: HostNode): HostNode {
+  if (!isGestureButton(node) || node.props.accessible === true) return node;
+  return findDescendant(node, (n) => n.props.accessible === true, isInteractive) ?? node;
+}
+
 export function findAncestor(
   node: HostNode,
   predicate: (n: HostNode) => boolean,
@@ -180,20 +238,25 @@ export function findAncestor(
 }
 
 /**
- * Depth-first walk over host nodes, skipping subtrees hidden from screen
- * readers and subtrees for which `skip` returns true.
+ * Depth-first walk over host nodes, skipping subtrees for which `skip`
+ * returns true and subtrees hidden from screen readers on both platforms.
+ * Content hidden on only one platform is still audited: the other platform's
+ * screen reader reads it.
  */
 export function walk(
   root: HostNode,
   visit: (node: HostNode) => void,
   skip: (node: HostNode) => boolean = () => false,
+  hidden: { ios: boolean; android: boolean } = { ios: false, android: false },
 ): void {
+  let inherited = hidden;
   // The container (type '') is never audited itself.
   if (root.type !== '') {
-    if (isHiddenFromA11y(root) || skip(root)) return;
+    inherited = { ios: hidden.ios || hidesOnIOS(root), android: hidden.android || hidesOnAndroid(root) };
+    if ((inherited.ios && inherited.android) || skip(root)) return;
     visit(root);
   }
   for (const child of root.children) {
-    if (typeof child !== 'string') walk(child, visit, skip);
+    if (typeof child !== 'string') walk(child, visit, skip, inherited);
   }
 }

@@ -68,9 +68,23 @@ function componentName(type: unknown): string | undefined {
 }
 
 function isInternalName(name: string): boolean {
-  return /^(RCT|Animated|Virtualized|CellRenderer|Pressability|Touchable|Base|Android|IOS)/.test(name)
+  return /^(RCT|Animated|Virtualized|CellRenderer|Pressability|Touchable|Base|Android|IOS|ViewManagerAdapter_|GestureHandler|GestureDetector|NativeDetector|RNGestureHandler)/.test(name)
     || !/^[A-Z]/.test(name);
 }
+
+// Host elements rendered by third-party libraries: the library's name for
+// messages, and the library's own components, which wrap the host element at
+// various depths (seen under jest-expo) and are not the user's components.
+const LIBRARY_HOSTS: Record<string, { library: string; components: Set<string> }> = {};
+function library(name: string, hosts: string[], components: string[]) {
+  for (const host of hosts) LIBRARY_HOSTS[host] = { library: name, components: new Set([...hosts, ...components]) };
+}
+library('expo-image', ['ExpoImage', 'ViewManagerAdapter_ExpoImage'], ['Image']);
+library('expo-symbols', ['SymbolModule', 'ViewManagerAdapter_SymbolModule'], ['SymbolView']);
+library('gesture-handler', ['RNGestureHandlerButton'], [
+  'NativeDetector', 'RawButton', 'BaseButton', 'RectButton', 'BorderlessButton', 'Touchable', 'PressableWithTouchable', 'Pressable',
+]);
+library('@react-native-community/slider', ['RNCSlider'], ['Slider', 'SliderComponent']);
 
 /**
  * Composite components between `node` and its parent host element, innermost
@@ -91,24 +105,33 @@ export function ownComponentNames(node: HostNode): string[] {
   return names;
 }
 
-/** Nearest RN component (e.g. Pressable) and nearest user component (e.g. LoginScreen). */
+/**
+ * The component that rendered `node` as the user knows it (e.g. Pressable,
+ * or "gesture-handler RectButton") and the nearest user component (e.g.
+ * LoginScreen).
+ */
 export function describeOwners(node: HostNode): { rn?: string; user?: string } {
   const result: { rn?: string; user?: string } = {};
   try {
     let fiber = (node.unstable_fiber as FiberLike | null | undefined)?.return ?? null;
+    const lib = LIBRARY_HOSTS[node.type];
     // Only composites between this node and the next host ancestor rendered it.
     let ownWrapper = true;
+    let outermostLibraryComponent: string | undefined;
     while (fiber && !result.user) {
       if (typeof fiber.type === 'string') ownWrapper = false;
       const name = componentName(fiber.type);
       if (name) {
-        // Jest mocks wrap each host element in a composite of the same name.
-        if (isReactNativeComponent(fiber.type, name)) {
-          if (ownWrapper && name !== node.type) result.rn ??= name;
+        if (lib?.components.has(name)) {
+          if (!LIBRARY_HOSTS[name]) outermostLibraryComponent = name;
+        } else if (isReactNativeComponent(fiber.type, name)) {
+          // Jest mocks wrap each host element in a composite of the same name.
+          if (!lib && ownWrapper && name !== node.type) result.rn ??= name;
         } else if (!isInternalName(name)) result.user = name;
       }
       fiber = fiber.return;
     }
+    if (lib) result.rn = outermostLibraryComponent ? `${lib.library} ${outermostLibraryComponent}` : lib.library;
   } catch {
     // See note at the top of the file.
   }

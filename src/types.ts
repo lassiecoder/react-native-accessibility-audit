@@ -23,10 +23,16 @@ export type RuleId =
   | 'no-nested-interactive'
   | 'state-required'
   | 'adjustable-role-required'
+  | 'role-valid'
+  | 'accessibility-actions-valid'
   | 'link-role-misused'
   | 'no-empty-text'
+  | 'consistent-hiding'
+  | 'modal-hides-background'
+  | 'no-disabled-font-scaling'
   | 'touch-target-size'
-  | 'text-contrast';
+  | 'text-contrast'
+  | 'no-nested-text-link';
 
 /** Rule IDs from react-native-accessibility-engine, accepted for migration. */
 export type LegacyRuleId =

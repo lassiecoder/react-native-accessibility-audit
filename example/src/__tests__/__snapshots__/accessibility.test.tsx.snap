@@ -7,7 +7,7 @@ Found 7 accessibility violations:
 
 1. [image-label-required] Image has no label and is not marked as decorative.
    Element: <Image> in BrokenLoginScreen
-   Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, hide it with accessibilityElementsHidden and importantForAccessibility="no-hide-descendants", or aria-hidden.
+   Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.
 
 2. [input-label-required] Text input has only a placeholder ("Email"). Placeholders disappear once someone types, so they aren't a reliable label.
    Element: <TextInput> in BrokenLoginScreen
@@ -31,5 +31,5 @@ Found 7 accessibility violations:
 
 7. [no-nested-interactive] Interactive element is nested inside another interactive element.
    Element: Pressable → <View> role="button" name="Continue" in BrokenLoginScreen
-   Fix: Move the inner control out of the outer one. Screen readers usually focus only the outer element, so the inner one cannot be reached."
+   Fix: Move the inner control out of the outer one, or remove accessible={true} from the grouping View. Screen readers focus the outer element as one item, so the inner control cannot be reached."
 `;

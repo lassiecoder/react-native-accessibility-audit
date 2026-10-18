@@ -1,5 +1,8 @@
-import { backgroundBehind, blend, contrastRatio, inheritedTextStyle, parseColor, toHex } from './color';
+import { backgroundBehind, blend, contrastRatio, inheritedTextStyle, parseColor, toHex, type RGBA } from './color';
+import { describeElement } from './format';
+import { ACCESSIBILITY_ROLES, ARIA_ROLES, STANDARD_ACTIONS } from './roles';
 import {
+  accessibilityTarget,
   findAncestor,
   flattenStyle,
   getAccessibleName,
@@ -10,6 +13,8 @@ import {
   getTextContent,
   getValue,
   hasAndroidOnlyLabel,
+  hidesOnAndroid,
+  hidesOnIOS,
   isImage,
   isInteractive,
   isNativeSlider,
@@ -34,7 +39,7 @@ const interactiveRoleRequired: Rule = {
   help: 'Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.',
   check(node) {
     if (!isInteractive(node) || isSwitch(node)) return null;
-    const role = getRole(node);
+    const role = getRole(accessibilityTarget(node));
     if (!role) return 'Interactive element has no role.';
     if (NON_INTERACTIVE_ROLES.has(role)) {
       return `Interactive element has the non-interactive role "${role}".`;
@@ -79,8 +84,9 @@ const interactiveLabelRequired: Rule = {
   help: 'Add accessibilityLabel (or aria-label), or render visible Text inside the element.',
   check(node) {
     if (!isInteractive(node)) return null;
-    if (getAccessibleName(node)) return null;
-    return `Interactive element has no label or text, so screen readers can only announce its role.${hasAndroidOnlyLabel(node) ? ANDROID_ONLY_NOTE : ''}`;
+    const target = accessibilityTarget(node);
+    if (getAccessibleName(target)) return null;
+    return `Interactive element has no label or text, so screen readers can only announce its role.${hasAndroidOnlyLabel(target) ? ANDROID_ONLY_NOTE : ''}`;
   },
 };
 
@@ -88,15 +94,20 @@ const imageLabelRequired: Rule = {
   id: 'image-label-required',
   severity: 'error',
   description: 'Images must have a label or be marked as decorative.',
-  help: 'Add accessibilityLabel (or alt) describing the image. If it is decorative, hide it with accessibilityElementsHidden and importantForAccessibility="no-hide-descendants", or aria-hidden.',
+  help: 'Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.',
   check(node) {
     if (!isImage(node)) return null;
     if (getOwnLabel(node)) return null;
-    // alt="" or role="none" is an explicit "decorative" decision.
-    if (node.props.alt === '' || getRole(node) === 'none' || getRole(node) === 'presentation') return null;
-    if (node.props.importantForAccessibility === 'no') return null;
+    // Explicit "decorative" decisions that work on iOS and Android.
+    const role = getRole(node);
+    if (node.props.alt === '' || role === 'none' || role === 'presentation' || node.props.accessible === false) return null;
+    // Hidden on one platform only: consistent-hiding reports that.
+    if (hidesOnIOS(node) !== hidesOnAndroid(node)) return null;
     // Inside an accessible container the container's label is what gets read.
     if (findAncestor(node, (p) => p.props.accessible === true || isInteractive(p))) return null;
+    if (node.props.importantForAccessibility === 'no' && node.props.accessibilityElementsHidden !== true) {
+      return 'Image is marked decorative with importantForAccessibility="no", which only applies on Android.';
+    }
     return 'Image has no label and is not marked as decorative.';
   },
 };
@@ -104,12 +115,14 @@ const imageLabelRequired: Rule = {
 const noNestedInteractive: Rule = {
   id: 'no-nested-interactive',
   severity: 'error',
-  description: 'Interactive elements must not be nested inside other interactive elements.',
-  help: 'Move the inner control out of the outer one. Screen readers usually focus only the outer element, so the inner one cannot be reached.',
+  description: 'Interactive elements must not be nested inside other interactive elements or accessible groups.',
+  help: 'Move the inner control out of the outer one, or remove accessible={true} from the grouping View. Screen readers focus the outer element as one item, so the inner control cannot be reached.',
   check(node) {
     if (!isInteractive(node)) return null;
-    return findAncestor(node, isInteractive)
-      ? 'Interactive element is nested inside another interactive element.'
+    if (findAncestor(node, isInteractive)) return 'Interactive element is nested inside another interactive element.';
+    // On iOS an accessible element hides its children from VoiceOver.
+    return findAncestor(node, (p) => p.props.accessible === true && !isInteractive(p))
+      ? 'Interactive element is inside an accessible={true} container, which VoiceOver focuses as a single element, so this control cannot be reached on iOS.'
       : null;
   },
 };
@@ -183,6 +196,140 @@ const noEmptyText: Rule = {
   },
 };
 
+const consistentHiding: Rule = {
+  id: 'consistent-hiding',
+  severity: 'error',
+  description: 'Content hidden from screen readers must be hidden on both iOS and Android.',
+  help: 'Use aria-hidden, which works on both platforms, or set accessibilityElementsHidden (iOS) together with importantForAccessibility="no-hide-descendants" (Android).',
+  check(node) {
+    const ios = hidesOnIOS(node);
+    const android = hidesOnAndroid(node);
+    if (ios === android) return null;
+    const otherHides = ios ? hidesOnAndroid : hidesOnIOS;
+    // The other platform may already be covered by an ancestor, or by the
+    // descendants that hold all of the readable content.
+    if (findAncestor(node, otherHides)) return null;
+    if (!hasReadableContent(node, (n) => n !== node && otherHides(n))) return null;
+    return ios
+      ? 'Element is hidden from VoiceOver with accessibilityElementsHidden, but TalkBack still reads it.'
+      : 'Element is hidden from TalkBack with importantForAccessibility="no-hide-descendants", but VoiceOver still reads it.';
+  },
+};
+
+/** Whether a screen reader can reach anything in the subtree; `hidden` says what hides a node from it. */
+function hasReadableContent(node: HostNode, hidden: (n: HostNode) => boolean): boolean {
+  if (hidden(node)) return false;
+  if (isInteractive(node) || getOwnLabel(node)) return true;
+  if (isText(node) && node.children.some((c) => typeof c === 'string' && c.trim() !== '')) return true;
+  return node.children.some((c) => typeof c !== 'string' && hasReadableContent(c, hidden));
+}
+
+const modalHidesBackground: Rule = {
+  id: 'modal-hides-background',
+  severity: 'error',
+  description: 'Content behind a modal must be hidden from screen readers.',
+  help: 'aria-modal / accessibilityViewIsModal only work on iOS, and only hide the modal\'s sibling views. While the modal is open, set importantForAccessibility="no-hide-descendants" on the content behind it (or aria-hidden, for both platforms), or render the modal with React Native\'s Modal component.',
+  check(node) {
+    if (node.props['aria-modal'] !== true && node.props.accessibilityViewIsModal !== true) return null;
+    const androidExposed: HostNode[] = [];
+    const bothExposed: HostNode[] = [];
+    for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
+      const direct = child === node;
+      for (const sibling of parent.children) {
+        if (typeof sibling === 'string' || sibling === child) continue;
+        // iOS hides the modal's direct siblings; Android hides nothing.
+        if (direct) {
+          if (hasReadableContent(sibling, hidesOnAndroid)) androidExposed.push(sibling);
+        } else if (hasReadableContent(sibling, (n) => hidesOnIOS(n) && hidesOnAndroid(n))) {
+          bothExposed.push(sibling);
+        }
+      }
+    }
+    if (bothExposed.length > 0) {
+      return `Content outside the modal is still read by VoiceOver and TalkBack: aria-modal only hides the modal's direct siblings. First exposed element: ${describeElement(bothExposed[0])}.`;
+    }
+    if (androidExposed.length > 0) {
+      return `aria-modal / accessibilityViewIsModal only work on iOS, so TalkBack still reads the content behind the modal. First exposed element: ${describeElement(androidExposed[0])}.`;
+    }
+    return null;
+  },
+};
+
+const noDisabledFontScaling: Rule = {
+  id: 'no-disabled-font-scaling',
+  severity: 'error',
+  description: 'Text must grow with the system font size (WCAG 1.4.4).',
+  help: 'Remove allowFontScaling={false}. If a layout breaks at large sizes, fix the layout (minHeight instead of height, let text wrap), or limit growth with maxFontSizeMultiplier; 2 or more still allows the 200% WCAG requires.',
+  check(node) {
+    const kind = isText(node) ? 'Text' : isTextInput(node) ? 'Text input' : null;
+    if (!kind) return null;
+    if (node.props.allowFontScaling === false) {
+      return `${kind} has allowFontScaling={false}, so it ignores the user's text size setting.`;
+    }
+    const max = node.props.maxFontSizeMultiplier;
+    // 0 means "no limit"; 1 means the text can't grow at all.
+    if (typeof max === 'number' && max > 0 && max <= 1) {
+      return `${kind} has maxFontSizeMultiplier={${max}}, so it can't grow beyond its base size.`;
+    }
+    return null;
+  },
+};
+
+const accessibilityActionsValid: Rule = {
+  id: 'accessibility-actions-valid',
+  severity: 'error',
+  description: 'Accessibility actions must have names, labels for custom actions, and a handler.',
+  help: 'Give every action a name, give custom actions (anything other than activate, increment, decrement, longpress, magicTap, escape) a label for screen readers to announce, and handle them in onAccessibilityAction.',
+  check(node) {
+    const actions: unknown[] = Array.isArray(node.props.accessibilityActions) ? node.props.accessibilityActions : [];
+    if (actions.length === 0) return null;
+    const problems: string[] = [];
+    const named = actions.filter((a): a is { name: string; label?: unknown } => typeof (a as { name?: unknown })?.name === 'string' && (a as { name: string }).name.trim() !== '');
+    if (named.length < actions.length) problems.push('an action has no name');
+    const unlabelled = named.filter((a) => !STANDARD_ACTIONS.has(a.name) && !(typeof a.label === 'string' && a.label.trim()));
+    if (unlabelled.length > 0) {
+      problems.push(`custom action${unlabelled.length > 1 ? 's' : ''} ${unlabelled.map((a) => `"${a.name}"`).join(', ')} ${unlabelled.length > 1 ? 'have' : 'has'} no label to announce`);
+    }
+    // Native sliders handle their actions natively.
+    if (typeof node.props.onAccessibilityAction !== 'function' && !isNativeSlider(node)) {
+      problems.push('there is no onAccessibilityAction handler, so activating an action does nothing');
+    }
+    return problems.length > 0 ? `Accessibility actions are broken: ${problems.join('; ')}.` : null;
+  },
+};
+
+const roleValid: Rule = {
+  id: 'role-valid',
+  severity: 'error',
+  description: 'Roles must be values React Native supports.',
+  help: 'Use a supported value. accessibilityRole takes React Native names ("header", "image"); role takes ARIA names ("heading", "img"). Unsupported values are ignored, and some make Android throw.',
+  check(node) {
+    const { accessibilityRole, role } = node.props;
+    if (typeof accessibilityRole === 'string' && !ACCESSIBILITY_ROLES.has(accessibilityRole)) {
+      const hint = ARIA_ROLES.has(accessibilityRole) ? ` It is a valid value for role; use role="${accessibilityRole}" instead.` : '';
+      return `accessibilityRole="${accessibilityRole}" is not a role React Native supports.${hint}`;
+    }
+    if (typeof role === 'string' && !ARIA_ROLES.has(role)) {
+      const hint = ACCESSIBILITY_ROLES.has(role) ? ` It is a valid value for accessibilityRole; use accessibilityRole="${role}" instead.` : '';
+      return `role="${role}" is not a role React Native supports.${hint}`;
+    }
+    return null;
+  },
+};
+
+const noNestedTextLink: Rule = {
+  id: 'no-nested-text-link',
+  severity: 'warn',
+  description: 'Pressable text inside a paragraph may not be reachable with a screen reader.',
+  help: 'Render the link as its own Text outside the paragraph, or make the whole paragraph the pressable element. If you keep it inline, test it with VoiceOver and TalkBack.',
+  check(node) {
+    if (!isText(node) || !isInteractive(node)) return null;
+    return findAncestor(node, isText)
+      ? 'Pressable Text nested inside another Text cannot be focused on its own by VoiceOver on iOS (react-native#53243).'
+      : null;
+  },
+};
+
 function size(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined;
 }
@@ -219,8 +366,9 @@ const touchTargetSize: Rule = {
 };
 
 function isLargeText(node: HostNode): boolean {
-  const fontSize = size(inheritedTextStyle(node, 'fontSize')) ?? 14;
-  const weight = inheritedTextStyle(node, 'fontWeight');
+  const style = (key: string) => (isTextInput(node) ? flattenStyle(node.props.style)[key] : inheritedTextStyle(node, key));
+  const fontSize = size(style('fontSize')) ?? 14;
+  const weight = style('fontWeight');
   const bold = weight === 'bold' || Number(weight) >= 700;
   // WCAG "large text": 18pt, or 14pt bold (24px / 18.66px).
   return fontSize >= 24 || (bold && fontSize >= 18.66);
@@ -234,17 +382,27 @@ const textContrast: Rule = {
   description: 'Text should have enough contrast with its background (WCAG AA).',
   help: 'Darken or lighten the text or background color. WCAG AA needs 4.5:1 for normal text and 3:1 for large text.',
   check(node) {
+    const background = backgroundBehind(node);
+    if (!background) return null;
+    const required = isLargeText(node) ? 3 : 4.5;
+    const failure = (what: string, color: RGBA | null) => {
+      if (!color) return null;
+      const ratio = contrastRatio(blend(color, background), background);
+      if (ratio >= required) return null;
+      return `${what} contrast is ${ratio.toFixed(2)}:1 (${toHex(blend(color, background))} on ${toHex(background)}), below ${required}:1.`;
+    };
+
+    if (isTextInput(node)) {
+      const hasPlaceholder = typeof node.props.placeholder === 'string' && node.props.placeholder.trim() !== '';
+      return (
+        (hasPlaceholder ? failure('Placeholder', parseColor(node.props.placeholderTextColor)) : null) ??
+        failure('Input text', parseColor(flattenStyle(node.props.style).color))
+      );
+    }
     if (!isText(node)) return null;
     // Only text this node renders itself; nested Text is checked on its own.
     if (!node.children.some((c) => typeof c === 'string' && c.trim() !== '')) return null;
-    const color = parseColor(inheritedTextStyle(node, 'color'));
-    const background = backgroundBehind(node);
-    if (!color || !background) return null;
-
-    const ratio = contrastRatio(blend(color, background), background);
-    const required = isLargeText(node) ? 3 : 4.5;
-    if (ratio >= required) return null;
-    return `Text contrast is ${ratio.toFixed(2)}:1 (${toHex(blend(color, background))} on ${toHex(background)}), below ${required}:1.`;
+    return failure('Text', parseColor(inheritedTextStyle(node, 'color')));
   },
 };
 
@@ -257,10 +415,16 @@ export const rules: Rule[] = [
   noNestedInteractive,
   stateRequired,
   adjustableRoleRequired,
+  roleValid,
+  accessibilityActionsValid,
   linkRoleMisused,
   noEmptyText,
+  consistentHiding,
+  modalHidesBackground,
+  noDisabledFontScaling,
   touchTargetSize,
   textContrast,
+  noNestedTextLink,
 ];
 
 export const ruleIds = rules.map((r) => r.id) as RuleId[];
