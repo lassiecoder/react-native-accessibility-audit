@@ -17,10 +17,40 @@ export type RuleSetting = Severity | 'off';
 export type RuleId =
   | 'interactive-role-required'
   | 'interactive-label-required'
+  | 'interactive-accessible-required'
   | 'image-label-required'
   | 'no-nested-interactive'
   | 'state-required'
+  | 'link-role-misused'
+  | 'no-empty-text'
+  | 'touch-target-size'
+  | 'text-contrast';
+
+/** Rule IDs from react-native-accessibility-engine, accepted for migration. */
+export type LegacyRuleId =
+  | 'pressable-accessible-required'
+  | 'pressable-role-required'
+  | 'pressable-label-required'
+  | 'link-role-required'
+  | 'link-role-misused'
+  | 'adjustable-role-required'
+  | 'adjustable-value-required'
+  | 'checked-state-required'
+  | 'disabled-state-required'
   | 'no-empty-text';
+
+/**
+ * Per-rule severities, or (as in react-native-accessibility-engine) an array
+ * of the only rule IDs to run.
+ */
+export type RulesOption =
+  | Partial<Record<RuleId | LegacyRuleId, RuleSetting>>
+  | Array<RuleId | LegacyRuleId>;
+
+export interface RuleContext {
+  /** Minimum touch target size in dp/pt. */
+  minTouchTarget: number;
+}
 
 export interface Rule {
   id: RuleId;
@@ -30,7 +60,7 @@ export interface Rule {
   /** How to fix a violation, shown in failure output. */
   help: string;
   /** Returns a problem description for `node`, or null when it passes. */
-  check(node: HostNode): string | null;
+  check(node: HostNode, context: RuleContext): string | null;
 }
 
 export interface Violation {
@@ -58,8 +88,14 @@ export interface IgnoreOptions {
 
 export interface AuditOptions {
   /** Override severity per rule, or turn a rule off. */
-  rules?: Partial<Record<RuleId, RuleSetting>>;
+  rules?: RulesOption;
   ignore?: IgnoreOptions;
+  /**
+   * Minimum touch target size for `touch-target-size`, in dp/pt.
+   * Defaults to 44 (Apple HIG and WCAG 2.5.5). Use 48 for Material, 24 for
+   * the WCAG 2.2 AA minimum.
+   */
+  minTouchTarget?: number;
 }
 
 export interface MatcherOptions extends AuditOptions {
@@ -68,4 +104,9 @@ export interface MatcherOptions extends AuditOptions {
    * A string names the baseline; `true` uses the current test's name.
    */
   baseline?: string | true;
+  /**
+   * Receives the violations before the matcher decides pass/fail and returns
+   * the ones to keep (react-native-accessibility-engine compatible).
+   */
+  customViolationHandler?: (violations: Violation[]) => Violation[];
 }

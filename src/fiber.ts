@@ -1,3 +1,4 @@
+import { loadFromProject } from './project';
 import type { HostNode } from './types';
 
 // test-renderer exposes the React fiber as `unstable_fiber`. It is the only
@@ -17,6 +18,43 @@ export const RN_COMPONENTS = new Set([
   'TouchableNativeFeedback', 'ScrollView', 'FlatList', 'SectionList', 'VirtualizedList',
   'Modal', 'SafeAreaView', 'KeyboardAvoidingView', 'ActivityIndicator', 'RefreshControl',
 ]);
+
+let reactNative: Record<string, unknown> | null | undefined;
+const rnTypesByName = new Map<string, Set<unknown>>();
+
+/**
+ * Compares against the component React Native actually exports under `name`,
+ * so a user's own `Button` isn't mistaken for React Native's. Exports are read
+ * only once a component with that name shows up: reading deprecated ones
+ * (e.g. SafeAreaView) logs a warning. Falls back to the name alone when
+ * react-native can't be loaded.
+ */
+function isReactNativeComponent(type: unknown, name: string): boolean {
+  if (!RN_COMPONENTS.has(name)) return false;
+  if (reactNative === undefined) {
+    try {
+      reactNative = loadFromProject<Record<string, unknown>>('react-native');
+    } catch {
+      reactNative = null;
+    }
+  }
+  if (!reactNative) return true;
+
+  let types = rnTypesByName.get(name);
+  if (!types) {
+    types = new Set();
+    // memo() and forwardRef() wrappers get their own fibers, so register
+    // the inner types as well as the exported one.
+    let current: unknown = reactNative[name];
+    for (let depth = 0; current && depth < 4; depth++) {
+      types.add(current);
+      const t = current as { type?: unknown; render?: unknown };
+      current = typeof current === 'object' ? (t.type ?? t.render) : undefined;
+    }
+    rnTypesByName.set(name, types);
+  }
+  return types.has(type);
+}
 
 function componentName(type: unknown): string | undefined {
   if (typeof type === 'function') {
@@ -65,7 +103,7 @@ export function describeOwners(node: HostNode): { rn?: string; user?: string } {
       const name = componentName(fiber.type);
       if (name) {
         // Jest mocks wrap each host element in a composite of the same name.
-        if (RN_COMPONENTS.has(name)) {
+        if (isReactNativeComponent(fiber.type, name)) {
           if (ownWrapper && name !== node.type) result.rn ??= name;
         } else if (!isInternalName(name)) result.user = name;
       }

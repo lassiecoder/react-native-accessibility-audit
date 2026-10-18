@@ -176,3 +176,125 @@ test('skips subtrees hidden from screen readers', async () => {
   );
   expect(result).toEqual([]);
 });
+
+describe('interactive-accessible-required', () => {
+  const rule = 'interactive-accessible-required';
+
+  test('flags accessible={false} on a control', async () => {
+    const el = <TouchableOpacity onPress={noop} accessible={false} accessibilityRole="button"><Text>Go</Text></TouchableOpacity>;
+    expect(await violations(el, rule)).toEqual([rule]);
+  });
+
+  test('passes default controls and inline text links', async () => {
+    const el = (
+      <View>
+        <Pressable onPress={noop} accessibilityRole="button"><Text>Go</Text></Pressable>
+        <Text accessible={false} onPress={noop} role="link">Terms</Text>
+      </View>
+    );
+    expect(await violations(el, rule)).toEqual([]);
+  });
+});
+
+describe('link-role-misused', () => {
+  const rule = 'link-role-misused';
+
+  test('flags a link that does nothing', async () => {
+    expect(await violations(<Text role="link">Terms</Text>, rule)).toEqual([rule]);
+  });
+
+  test.each([
+    ['Text with onPress', <Text role="link" onPress={noop}>Terms</Text>],
+    ['inside a pressable', <Pressable onPress={noop} accessibilityRole="link"><Text role="link">Terms</Text></Pressable>],
+  ])('passes %s', async (_, el) => {
+    expect(await violations(el, rule)).toEqual([]);
+  });
+});
+
+describe('touch-target-size', () => {
+  const rule = 'touch-target-size';
+  const button = (props: object) => (
+    <Pressable onPress={noop} accessibilityRole="button" accessibilityLabel="Close" {...props} />
+  );
+
+  test.each([
+    ['24×24', button({ style: { width: 24, height: 24 } }), 'Touch target is 24×24, smaller than 44×44.'],
+    ['only height known', button({ style: { minHeight: 30 } }), 'Touch target is ?×30, smaller than 44×44.'],
+    ['style array', button({ style: [{ width: 50 }, { height: 20 }] }), 'Touch target is 50×20, smaller than 44×44.'],
+    ['hitSlop too small', button({ style: { width: 24, height: 24 }, hitSlop: 5 }), 'Touch target is 34×34, smaller than 44×44.'],
+  ])('flags %s', async (_, el, message) => {
+    await render(el);
+    const found = audit(screen.container).filter((v) => v.ruleId === rule);
+    expect(found.map((v) => [v.severity, v.message])).toEqual([['warn', message]]);
+  });
+
+  test.each([
+    ['44×44', button({ style: { width: 44, height: 44 } })],
+    ['minHeight 48, width unknown', button({ style: { minHeight: 48 } })],
+    ['hitSlop number', button({ style: { width: 24, height: 24 }, hitSlop: 10 })],
+    ['hitSlop object', button({ style: { width: 24, height: 24 }, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } })],
+    ['no explicit size', button({ style: { padding: 4 } })],
+    ['percentage size', button({ style: { width: '100%', height: '10%' } })],
+    ['inline text link', <Text role="link" onPress={noop} style={{ height: 12 }}>Terms</Text>],
+  ])('passes %s', async (_, el) => {
+    expect(await violations(el, rule)).toEqual([]);
+  });
+
+  test('minTouchTarget option', async () => {
+    await render(button({ style: { width: 30, height: 30 } }));
+    expect(audit(screen.container, { minTouchTarget: 24 }).filter((v) => v.ruleId === rule)).toEqual([]);
+    expect(audit(screen.container, { minTouchTarget: 48 }).filter((v) => v.ruleId === rule)).toHaveLength(1);
+  });
+});
+
+describe('text-contrast', () => {
+  const rule = 'text-contrast';
+
+  async function contrast(el: React.ReactElement) {
+    await render(el);
+    return audit(screen.container).filter((v) => v.ruleId === rule).map((v) => v.message);
+  }
+
+  test('flags light grey on white', async () => {
+    expect(await contrast(
+      <View style={{ backgroundColor: '#fff' }}><Text style={{ color: '#d4d4d4' }}>Faint</Text></View>,
+    )).toEqual(['Text contrast is 1.48:1 (#d4d4d4 on #ffffff), below 4.5:1.']);
+  });
+
+  test('uses 3:1 for large text', async () => {
+    // #949494 on white is ~3.03:1: fails normal text, passes large text.
+    const bg = { backgroundColor: 'white' };
+    expect(await contrast(<View style={bg}><Text style={{ color: '#949494' }}>Small</Text></View>)).toHaveLength(1);
+    expect(await contrast(<View style={bg}><Text style={{ color: '#949494', fontSize: 24 }}>Large</Text></View>)).toEqual([]);
+    expect(await contrast(<View style={bg}><Text style={{ color: '#949494', fontSize: 19, fontWeight: 'bold' }}>Bold</Text></View>)).toEqual([]);
+  });
+
+  test('blends semi-transparent text and backgrounds', async () => {
+    expect(await contrast(
+      <View style={{ backgroundColor: '#000' }}>
+        <View style={{ backgroundColor: 'rgba(255,255,255,0.5)' }}>
+          <Text style={{ color: 'rgba(0,0,0,0.2)' }}>Ghost</Text>
+        </View>
+      </View>,
+    )).toHaveLength(1);
+  });
+
+  test('inherits color from an enclosing Text', async () => {
+    expect(await contrast(
+      <View style={{ backgroundColor: '#fff' }}>
+        <Text style={{ color: '#eee' }}>Outer <Text>inner</Text></Text>
+      </View>,
+    )).toHaveLength(2);
+  });
+
+  test.each([
+    ['good contrast', <View style={{ backgroundColor: '#fff' }}><Text style={{ color: '#333' }}>Dark</Text></View>],
+    ['white on blue button', <View style={{ backgroundColor: '#1d4ed8' }}><Text style={{ color: '#fff' }}>Continue</Text></View>],
+    ['no background set', <Text style={{ color: '#ddd' }}>Unknown</Text>],
+    ['no text color set', <View style={{ backgroundColor: '#fff' }}><Text>Default</Text></View>],
+    ['only transparent backgrounds', <View style={{ backgroundColor: 'transparent' }}><Text style={{ color: '#eee' }}>x</Text></View>],
+    ['platform color', <View style={{ backgroundColor: '#fff' }}><Text style={{ color: { semantic: ['label'] } as never }}>x</Text></View>],
+  ])('passes %s', async (_, el) => {
+    expect(await contrast(el)).toEqual([]);
+  });
+});

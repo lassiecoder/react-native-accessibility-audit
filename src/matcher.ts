@@ -3,6 +3,7 @@ import * as path from 'path';
 import { audit, resolveRoot } from './audit';
 import { baselinePath, compareToBaseline, countFingerprints, readBaseline, writeBaseline } from './baseline';
 import { formatViolations } from './format';
+import { isReactElement, renderElement } from './render-element';
 import type { MatcherOptions, Violation } from './types';
 
 /** Jest's snapshot update mode: `-u` is 'all', default is 'new', `--ci` is 'none'. */
@@ -26,35 +27,53 @@ interface MatcherResult {
 export function toBeAccessible(this: MatcherContext, received: unknown, options: MatcherOptions = {}): MatcherResult {
   const hint = this.utils.matcherHint('toBeAccessible', 'element', '', { isNot: this.isNot });
 
+  if (isReactElement(received)) {
+    const rendered = renderElement(received, this.testPath);
+    try {
+      // Build the message now: it describes elements that are gone after unmount.
+      const result = check(this, hint, rendered.container, options);
+      const message = result.message();
+      return { pass: result.pass, message: () => message };
+    } finally {
+      rendered.unmount();
+    }
+  }
+
   if (!resolveRoot(received)) {
     return {
       pass: false,
       message: () =>
-        `${hint}\n\nReceived value is not a rendered element. Pass screen.root, screen.container, or an element from a query.`,
+        `${hint}\n\nReceived value is not a rendered element. Pass screen.root, screen.container, an element from a query, or a React element.`,
     };
   }
+  return check(this, hint, received, options);
+}
 
-  const { baseline, ...auditOptions } = options;
-  const violations = audit(received, auditOptions);
+function check(context: MatcherContext, hint: string, target: unknown, options: MatcherOptions): MatcherResult {
+  const { baseline, customViolationHandler, ...auditOptions } = options;
+  let violations = audit(target, auditOptions);
+  // react-native-accessibility-engine also read the handler from a Jest global.
+  const handler =
+    customViolationHandler ??
+    (globalThis as { __CUSTOM_VIOLATION_HANDLER__?: MatcherOptions['customViolationHandler'] }).__CUSTOM_VIOLATION_HANDLER__;
+  if (handler) violations = handler(violations);
+
   const errors = violations.filter((v) => v.severity === 'error');
   const warnings = violations.filter((v) => v.severity === 'warn');
 
-  if (warnings.length > 0 && !this.isNot) {
+  if (warnings.length > 0 && !context.isNot) {
     console.warn(`toBeAccessible() found ${count(warnings.length, 'accessibility warning')}:\n\n${formatViolations(warnings)}`);
   }
 
   if (baseline !== undefined) {
-    return matchBaseline(this, hint, baseline, errors);
+    return matchBaseline(context, hint, baseline, errors);
   }
 
   const pass = errors.length === 0;
-  return {
-    pass,
-    message: () =>
-      pass
-        ? `${hint}\n\nExpected accessibility violations, but found none.`
-        : `${hint}\n\nFound ${count(errors.length, 'accessibility violation')}:\n\n${formatViolations(errors)}`,
-  };
+  const message = pass
+    ? `${hint}\n\nExpected accessibility violations, but found none.`
+    : `${hint}\n\nFound ${count(errors.length, 'accessibility violation')}:\n\n${formatViolations(errors)}`;
+  return { pass, message: () => message };
 }
 
 function matchBaseline(

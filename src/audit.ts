@@ -39,7 +39,8 @@ export function audit(target: unknown, options: AuditOptions = {}): Violation[] 
     );
   }
 
-  const { rules: settings = {}, ignore = {} } = mergeOptions(getGlobalOptions(), options);
+  const { rules: settings, ignore = {}, minTouchTarget = 44 } = mergeOptions(getGlobalOptions(), options);
+  const context = { minTouchTarget };
   const active: Array<{ rule: (typeof rules)[number]; severity: Severity }> = [];
   for (const rule of rules) {
     const severity = settings[rule.id] ?? rule.severity;
@@ -51,7 +52,7 @@ export function audit(target: unknown, options: AuditOptions = {}): Violation[] 
     root,
     (node) => {
       for (const { rule, severity } of active) {
-        const message = rule.check(node);
+        const message = rule.check(node, context);
         if (message) {
           violations.push({ ruleId: rule.id, severity, message, help: rule.help, element: node });
         }

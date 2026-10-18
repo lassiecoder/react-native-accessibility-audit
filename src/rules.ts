@@ -1,5 +1,7 @@
+import { backgroundBehind, blend, contrastRatio, inheritedTextStyle, parseColor, toHex } from './color';
 import {
   findAncestor,
+  flattenStyle,
   getAccessibleName,
   getOwnLabel,
   getRole,
@@ -11,7 +13,7 @@ import {
   isSwitch,
   isText,
 } from './tree';
-import type { Rule, RuleId } from './types';
+import type { HostNode, Rule, RuleId } from './types';
 
 // Roles that describe content, not a control. On a pressable they make the
 // screen reader announce the element as something you can't activate.
@@ -32,6 +34,19 @@ const interactiveRoleRequired: Rule = {
       return `Interactive element has the non-interactive role "${role}".`;
     }
     return null;
+  },
+};
+
+const interactiveAccessibleRequired: Rule = {
+  id: 'interactive-accessible-required',
+  severity: 'error',
+  description: 'Interactive elements must be focusable by screen readers.',
+  help: 'Remove accessible={false} from the control. To group it with other content, make the parent accessible instead.',
+  check(node) {
+    if (!isInteractive(node) || isText(node)) return null;
+    return node.props.accessible === false
+      ? 'Interactive element has accessible={false}, so screen readers cannot focus it.'
+      : null;
   },
 };
 
@@ -103,6 +118,18 @@ const stateRequired: Rule = {
   },
 };
 
+const linkRoleMisused: Rule = {
+  id: 'link-role-misused',
+  severity: 'error',
+  description: 'The "link" role must only be used on elements that can be activated.',
+  help: 'Add onPress to the element, or remove role="link" if it is not a link.',
+  check(node) {
+    if (getRole(node) !== 'link') return null;
+    if (isInteractive(node) || findAncestor(node, isInteractive)) return null;
+    return 'Element has the "link" role but nothing happens when it is activated.';
+  },
+};
+
 const noEmptyText: Rule = {
   id: 'no-empty-text',
   severity: 'error',
@@ -117,13 +144,82 @@ const noEmptyText: Rule = {
   },
 };
 
+function size(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
+function hitSlop(value: unknown): { top: number; bottom: number; left: number; right: number } {
+  if (typeof value === 'number') return { top: value, bottom: value, left: value, right: value };
+  const v = (value ?? {}) as Record<string, unknown>;
+  return { top: size(v.top) ?? 0, bottom: size(v.bottom) ?? 0, left: size(v.left) ?? 0, right: size(v.right) ?? 0 };
+}
+
+// The test renderer runs no layout, so sizes come from explicit styles only.
+// Elements without a numeric width/height are skipped rather than guessed.
+const touchTargetSize: Rule = {
+  id: 'touch-target-size',
+  severity: 'warn',
+  description: 'Touch targets should be large enough to tap reliably.',
+  help: 'Increase width/height (or minWidth/minHeight), or add hitSlop to extend the touchable area without changing the layout.',
+  check(node, { minTouchTarget }) {
+    // Inline text links are exempt (WCAG 2.5.8); native switches are sized by the platform.
+    if (!isInteractive(node) || isText(node) || isSwitch(node)) return null;
+    const style = flattenStyle(node.props.style);
+    const width = size(style.width) ?? size(style.minWidth);
+    const height = size(style.height) ?? size(style.minHeight);
+    if (width === undefined && height === undefined) return null;
+
+    const slop = hitSlop(node.props.hitSlop);
+    const w = width === undefined ? undefined : width + slop.left + slop.right;
+    const h = height === undefined ? undefined : height + slop.top + slop.bottom;
+    if ((w ?? Infinity) >= minTouchTarget && (h ?? Infinity) >= minTouchTarget) return null;
+
+    const shown = `${w ?? '?'}×${h ?? '?'}`;
+    return `Touch target is ${shown}, smaller than ${minTouchTarget}×${minTouchTarget}.`;
+  },
+};
+
+function isLargeText(node: HostNode): boolean {
+  const fontSize = size(inheritedTextStyle(node, 'fontSize')) ?? 14;
+  const weight = inheritedTextStyle(node, 'fontWeight');
+  const bold = weight === 'bold' || Number(weight) >= 700;
+  // WCAG "large text": 18pt, or 14pt bold (24px / 18.66px).
+  return fontSize >= 24 || (bold && fontSize >= 18.66);
+}
+
+// Only checked when both colors are known from styles: the text color set on
+// the Text (or an enclosing Text) and an opaque background on an ancestor.
+const textContrast: Rule = {
+  id: 'text-contrast',
+  severity: 'warn',
+  description: 'Text should have enough contrast with its background (WCAG AA).',
+  help: 'Darken or lighten the text or background color. WCAG AA needs 4.5:1 for normal text and 3:1 for large text.',
+  check(node) {
+    if (!isText(node)) return null;
+    // Only text this node renders itself; nested Text is checked on its own.
+    if (!node.children.some((c) => typeof c === 'string' && c.trim() !== '')) return null;
+    const color = parseColor(inheritedTextStyle(node, 'color'));
+    const background = backgroundBehind(node);
+    if (!color || !background) return null;
+
+    const ratio = contrastRatio(blend(color, background), background);
+    const required = isLargeText(node) ? 3 : 4.5;
+    if (ratio >= required) return null;
+    return `Text contrast is ${ratio.toFixed(2)}:1 (${toHex(blend(color, background))} on ${toHex(background)}), below ${required}:1.`;
+  },
+};
+
 export const rules: Rule[] = [
   interactiveRoleRequired,
   interactiveLabelRequired,
+  interactiveAccessibleRequired,
   imageLabelRequired,
   noNestedInteractive,
   stateRequired,
+  linkRoleMisused,
   noEmptyText,
+  touchTargetSize,
+  textContrast,
 ];
 
 export const ruleIds = rules.map((r) => r.id) as RuleId[];
