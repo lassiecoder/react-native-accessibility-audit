@@ -1,0 +1,105 @@
+# Migrating from react-native-accessibility-engine
+
+`react-native-accessibility-engine` was last released in November 2022 (v3.2.0). It is built on `react-test-renderer`, which React 19 deprecates, and fails on React 19 with errors like `Can't access .root on unmounted test renderer`.
+
+This library keeps its API where it can, so most projects only change the dependency.
+
+## 1. Check requirements
+
+| | react-native-accessibility-engine | react-native-accessibility-audit |
+| --- | --- | --- |
+| React | up to 18 | 19+ |
+| React Native | any | 0.78+ (Expo SDK 53+) |
+| Renderer | react-test-renderer | @testing-library/react-native v14 |
+
+If you're still on React 18, upgrade React and React Native Testing Library first. RNTL v14 makes `render()` async, so existing `render()` calls need `await`. See the [RNTL v14 migration guide](https://callstack.github.io/react-native-testing-library/).
+
+## 2. Swap the package
+
+```sh
+npm uninstall react-native-accessibility-engine
+npm install --save-dev react-native-accessibility-audit
+```
+
+```diff
+  // jest.config.js
+  setupFilesAfterEnv: [
+-   'react-native-accessibility-engine',
++   'react-native-accessibility-audit',
+  ],
+```
+
+If you used the 1.x path `react-native-accessibility-engine/lib/commonjs/extend-expect`, replace it the same way.
+
+For TypeScript, replace `import 'react-native-accessibility-engine'` in your setup file with `import 'react-native-accessibility-audit'`, or add the package to `types` in `tsconfig.json`.
+
+## 3. What keeps working
+
+| react-native-accessibility-engine | Status |
+| --- | --- |
+| `expect(<Component />).toBeAccessible()` | Works. The element is rendered, audited and unmounted. |
+| `expect(getByRole('button')).toBeAccessible()` (RNTL) | Works. Add `await` to the `render()` call for RNTL v14. |
+| `toBeAccessible({ rules: ['no-empty-text'] })` | Works. An array still means "run only these rules". |
+| `toBeAccessible({ customViolationHandler })` | Works. |
+| `global.__A11Y_RULES__` / Jest `globals: { __A11Y_RULES__ }` | Works. |
+| `global.__CUSTOM_VIOLATION_HANDLER__` | Works. |
+| `expect(TestRenderer.create(<C />).root).toBeAccessible()` | **Not supported.** Throws an error that explains the fix. Use RNTL's `render()` and pass `screen.root`, or pass the element itself. |
+
+## 4. Rule IDs
+
+Old rule IDs are accepted in `rules` and mapped to the new rules. Unknown IDs throw, so typos don't silently turn a rule off.
+
+| Old ID | New rule |
+| --- | --- |
+| `pressable-role-required` | `interactive-role-required` |
+| `link-role-required` | `interactive-role-required` (text with `onPress` needs a role) |
+| `pressable-label-required` | `interactive-label-required` |
+| `pressable-accessible-required` | `interactive-accessible-required` |
+| `checked-state-required` | `state-required` |
+| `adjustable-value-required` | `state-required` |
+| `link-role-misused` | `link-role-misused` |
+| `no-empty-text` | `no-empty-text` |
+| `disabled-state-required` | Accepted, does nothing: React Native's pressables expose `disabled` themselves |
+| `adjustable-role-required` | Accepted, not covered yet |
+
+Because several old IDs map to one new rule, enabling one of them enables the whole new rule. For example, `rules: ['checked-state-required']` also checks slider values.
+
+## 5. Expect more findings
+
+The new rules catch issues the old engine didn't:
+
+- `image-label-required`: images that are neither labelled nor marked decorative
+- `no-nested-interactive`: buttons inside buttons
+- `touch-target-size` and `text-contrast`: printed as warnings, don't fail tests
+
+Detection is also broader. Any element that handles presses is checked, not only the components the old engine recognized by name.
+
+If switching produces a wall of failures, use baseline mode on the affected tests. It records today's violations and fails only on new ones:
+
+```tsx
+expect(screen.root).toBeAccessible({ baseline: true });
+```
+
+Then fix the recorded issues over time. See [Baseline mode](../README.md#baseline-mode).
+
+## 6. Excluding components
+
+The old engine had no way to skip third-party components ([issue #145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145)). Now:
+
+```ts
+import { configure } from 'react-native-accessibility-audit';
+
+configure({ ignore: { components: ['MapView'], testIDs: ['ad-banner'] } });
+```
+
+## Fixed issues from react-native-accessibility-engine
+
+| Issue | Status here |
+| --- | --- |
+| [#317](https://github.com/aryella-lacerda/react-native-accessibility-engine/pull/317) React 19 / unmounted test renderer | Built on RNTL v14 and test-renderer |
+| [#315](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/315) Jest can't exit (open handle) | Importing the package loads no renderer. test-renderer is loaded only when you pass a React element, and that element is unmounted after the audit. |
+| [#145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145) Exclude third-party components | `ignore` option |
+| [#258](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/258) Label rule doesn't find text in nested views | Text is read from the whole rendered subtree, including nested `accessible` views and labelled images |
+| [#307](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/307) `tab` role rejected; carousels required a disabled state | Any interactive role is accepted; there is no disabled-state rule, and slides hidden with `accessibilityElementsHidden` / `importantForAccessibility` are skipped |
+
+The cases from #258 and #307 are regression tests in `src/__tests__/migration.test.tsx`.

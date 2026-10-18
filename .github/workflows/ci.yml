@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  library:
+    name: Library (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --ci
+
+  example:
+    name: Expo example (jest-expo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            example/package-lock.json
+      # Root install runs `prepare`, which builds dist/ for the example's file:.. link.
+      - run: npm ci
+      - run: npm ci
+        working-directory: example
+      - run: npx tsc --noEmit
+        working-directory: example
+      - run: npx jest --ci
+        working-directory: example
+
+  oldest-supported:
+    name: Oldest supported (RN 0.78, React 19.0, Jest 29)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # RN 0.78 predates @react-native/jest-preset; it ships the 'react-native' preset.
+      - run: npm uninstall @react-native/jest-preset
+      - run: npm install --no-save react@19.0.0 react-native@0.78.3 @react-native/babel-preset@0.78.3 jest@^29 @types/jest@^29
+      - run: npx jest --ci --preset react-native

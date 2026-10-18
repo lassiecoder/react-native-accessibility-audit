@@ -38,6 +38,14 @@ export function audit(target: unknown, options: AuditOptions = {}): Violation[] 
       'audit() expects a rendered element, such as screen.root or screen.container from @testing-library/react-native.',
     );
   }
+  if (typeof root.type !== 'string') {
+    // react-test-renderer instances include composite components, which the
+    // host-element rules would misread (e.g. Pressable and its View as nested).
+    throw new TypeError(
+      'Received a tree with composite components, probably from react-test-renderer. ' +
+        'Render with @testing-library/react-native v14 and pass screen.root, or pass the React element itself.',
+    );
+  }
 
   const { rules: settings, ignore = {}, minTouchTarget = 44 } = mergeOptions(getGlobalOptions(), options);
   const context = { minTouchTarget };

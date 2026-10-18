@@ -125,3 +125,68 @@ describe('customViolationHandler', () => {
     expect(screen.container).toBeAccessible();
   });
 });
+
+test('rejects react-test-renderer style trees with composite components', () => {
+  function Card() {
+    return <Text>Card</Text>;
+  }
+  const legacyInstance = { type: Card, props: {}, children: [], parent: null };
+  expect(() => expect(legacyInstance).toBeAccessible()).toThrow('probably from react-test-renderer');
+});
+
+describe('react-native-accessibility-engine issues', () => {
+  // #258: label rule didn't find text inside nested accessible views.
+  test('#258 finds text in nested accessible views', () => {
+    function Card({ title, subtitle }: { title: string; subtitle: string }) {
+      return (
+        <Pressable onPress={noop} accessibilityRole="button" testID="tile" accessible>
+          <View accessible>
+            <View accessible>
+              <Text accessible>{title}</Text>
+              <View accessible>
+                <Text accessible>{subtitle}</Text>
+              </View>
+            </View>
+            <View>
+              <Image source={icon} />
+            </View>
+          </View>
+        </Pressable>
+      );
+    }
+    expect(<Card title="Electricity" subtitle="Due Friday" />).toBeAccessible();
+  });
+
+  // #307: "tab" role rejected; carousels required a disabled state.
+  test('#307 accepts tabs and carousels that hide inactive slides', () => {
+    function Tabs() {
+      const [index, setIndex] = React.useState(0);
+      return (
+        <View accessibilityRole="tablist">
+          {['First', 'Second'].map((title, i) => (
+            <Pressable
+              key={title}
+              onPress={() => setIndex(i)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: i === index }}
+            >
+              <Text>{title}</Text>
+            </Pressable>
+          ))}
+          {['A', 'B'].map((slide, i) => (
+            <View
+              key={slide}
+              accessibilityElementsHidden={i !== index}
+              importantForAccessibility={i === index ? 'auto' : 'no-hide-descendants'}
+            >
+              <Pressable onPress={noop} accessibilityRole="button">
+                <Text>{`Slide ${slide}`}</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      );
+    }
+    expect(<Tabs />).toBeAccessible();
+  });
+});
