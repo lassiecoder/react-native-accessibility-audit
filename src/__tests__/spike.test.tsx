@@ -10,11 +10,11 @@ import {
   View,
 } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
-import type { TestInstance } from 'test-renderer';
+import type { HostNode } from '../types';
 
 const SKIP = new Set(['children', 'style', 'source']);
 
-function dump(node: TestInstance, depth = 0): string[] {
+function dump(node: HostNode, depth = 0): string[] {
   const props = Object.entries(node.props)
     .filter(([k, v]) => !SKIP.has(k) && v !== undefined)
     .map(([k, v]) => `${k}=${typeof v === 'function' ? 'fn' : JSON.stringify(v)}`)

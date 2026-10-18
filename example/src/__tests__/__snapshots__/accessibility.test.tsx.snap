@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`broken login screen reports every issue 1`] = `
+"expect(element).toBeAccessible()
+
+Found 6 accessibility violations:
+
+1. [image-label-required] Image has no label and is not marked as decorative.
+   Element: <Image> in BrokenLoginScreen
+   Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, hide it with accessibilityElementsHidden and importantForAccessibility="no-hide-descendants", or aria-hidden.
+
+2. [no-empty-text] Text element has no content.
+   Element: <Text> in BrokenLoginScreen
+   Fix: Remove the empty Text, or render it only when it has content. Empty text creates a silent stop for screen readers.
+
+3. [interactive-role-required] Interactive element has no role.
+   Element: Pressable → <View> in BrokenLoginScreen
+   Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.
+
+4. [interactive-label-required] Interactive element has no label or text, so screen readers can only announce its role.
+   Element: Pressable → <View> in BrokenLoginScreen
+   Fix: Add accessibilityLabel (or aria-label), or render visible Text inside the element.
+
+5. [state-required] Element with role "checkbox" does not expose a checked state.
+   Element: Pressable → <View> role="checkbox" name="Remember me" in BrokenLoginScreen
+   Fix: Set accessibilityState={{ checked }} (or aria-checked) on checkboxes, radios, switches and toggle buttons; set accessibilityValue (or aria-valuenow / aria-valuetext) on adjustable controls.
+
+6. [no-nested-interactive] Interactive element is nested inside another interactive element.
+   Element: Pressable → <View> role="button" name="Continue" in BrokenLoginScreen
+   Fix: Move the inner control out of the outer one. Screen readers usually focus only the outer element, so the inner one cannot be reached."
+`;
