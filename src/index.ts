@@ -4,6 +4,8 @@ import type { MatcherOptions } from './types';
 export { audit } from './audit';
 export { configure, resetConfig } from './config';
 export { formatViolations } from './format';
+export { buildReport, formatGithub, formatMarkdown, formatText } from './report';
+export type { Report, ReportIssue } from './report';
 export { rules } from './rules';
 export { toBeAccessible };
 export type {

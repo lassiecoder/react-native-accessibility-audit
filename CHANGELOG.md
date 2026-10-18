@@ -27,6 +27,11 @@ First release. Not yet published to npm.
 - `ignore` by component name, `testID` or predicate, for third-party components.
 - Baseline mode: `toBeAccessible({ baseline })` records violations in `__a11y_baselines__/` and fails only on new ones. Follows Jest's snapshot modes (`-u`, `--ci`) and tightens automatically as violations are fixed.
 
+### Reports and CLI
+
+- Jest reporter (`react-native-accessibility-audit/reporter`) collects every `toBeAccessible()` result in a run into `a11y-report.json` (and optionally Markdown): deduplicated, prioritized, with the source file and line of each element.
+- CLI: `report` prints a report as text, a Markdown checklist, GitHub Actions annotations or JSON, with `--fail-on`; `baselines` lists the violations recorded in baseline files.
+
 ### react-native-accessibility-engine compatibility
 
 - Same `setupFilesAfterEnv` setup and matcher name.

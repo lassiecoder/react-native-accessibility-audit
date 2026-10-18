@@ -103,6 +103,7 @@ configure({ ignore: { components: ['MapView'], testIDs: ['ad-banner'] } });
 | [#317](https://github.com/aryella-lacerda/react-native-accessibility-engine/pull/317) React 19 / unmounted test renderer | Built on RNTL v14 and test-renderer |
 | [#315](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/315) Jest can't exit (open handle) | Importing the package loads no renderer. test-renderer is loaded only when you pass a React element, and that element is unmounted after the audit. |
 | [#145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145) Exclude third-party components | `ignore` option |
+| [#255](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/255) CLI listing components without accessibility, clickable first | Jest reporter and `report` / `baselines` CLI commands, with file and line for each issue |
 | [#258](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/258) Label rule doesn't find text in nested views | Text is read from the whole rendered subtree, including nested `accessible` views and labelled images |
 | [#307](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/307) `tab` role rejected; carousels required a disabled state | Any interactive role is accepted; there is no disabled-state rule, and slides hidden with `accessibilityElementsHidden` / `importantForAccessibility` are skipped |
 

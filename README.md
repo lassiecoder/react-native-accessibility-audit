@@ -24,6 +24,7 @@ test('login screen is accessible', async () => {
 - [Baseline mode](#baseline-mode)
 - [Ignoring third-party components](#ignoring-third-party-components)
 - [Using audit() directly](#using-audit-directly)
+- [Project reports and CLI](#project-reports-and-cli)
 - [Limitations](#limitations)
 - [Migrating from react-native-accessibility-engine](#migrating-from-react-native-accessibility-engine)
 - [Contributing](#contributing)
@@ -251,6 +252,62 @@ console.log(formatViolations(violations));
 ```
 
 Each violation has `ruleId`, `severity`, `message`, `help` and `element` (the host element).
+
+## Project reports and CLI
+
+Test failures tell you about one screen at a time. To see every issue across the app, including ones covered by baselines and warnings that don't fail tests, add the reporter:
+
+```js
+// jest.config.js
+module.exports = {
+  preset: 'jest-expo',
+  setupFilesAfterEnv: ['react-native-accessibility-audit'],
+  reporters: [
+    'default',
+    ['react-native-accessibility-audit/reporter', { outputFile: 'a11y-report.json', markdownFile: 'a11y-report.md' }],
+  ],
+};
+```
+
+After each run it prints a summary and writes the report:
+
+```
+Accessibility: 13 errors, 2 warnings in 6 audits. Report: a11y-report.json
+```
+
+The report collects every `toBeAccessible()` call in the run. Issues are deduplicated when several tests render the same component, and sorted so the most urgent come first: errors, then baselined errors, then warnings, with controls (buttons, inputs, toggles) ahead of images and text. Each issue points at the line that rendered the element, so it's a to-do list you can work through:
+
+```
+$ npx react-native-accessibility-audit report
+
+Accessibility: 13 errors, 2 warnings in 6 audits.
+
+src/screens/LoginScreen.tsx
+  37:7    error     input-label-required  Text input has only a placeholder ("Email"). ...
+                    <TextInput> in BrokenLoginScreen
+  41:7    error     interactive-label-required  Interactive element has no label or text, ...
+                    Pressable → <View> in BrokenLoginScreen
+  53:7    warning   text-contrast  Text contrast is 1.48:1 (#d4d4d4 on #ffffff), below 4.5:1.
+                    <Text> name="Forgot password?" in BrokenLoginScreen
+```
+
+| Command | Does |
+| --- | --- |
+| `report [file]` | Prints a report. `--format text` (default), `markdown` (a checklist), `github` or `json`. `--fail-on error` or `warn` exits with 1. |
+| `report --format github` | Prints [GitHub Actions annotations](https://docs.github.com/actions/reference/workflow-commands-for-github-actions), which show the issues inline on the pull request. Add `--include-baselined` to show baselined issues as notices. |
+| `baselines [dir]` | Lists everything recorded in `__a11y_baselines__` files: your known accessibility debt. Doesn't need a test run. `--format text`, `markdown` or `json`. |
+
+In GitHub Actions:
+
+```yaml
+- run: npx jest --ci
+- run: npx react-native-accessibility-audit report --format github
+  if: always()
+```
+
+Reporter options: `outputFile` (default `a11y-report.json`, relative to Jest's `rootDir`), `markdownFile` (optional), `summary` (default `true`). Audits using `.not.toBeAccessible()` aren't recorded, since those tests expect violations. Source locations need React 19.1 or later in its development build, which Jest uses by default. With React 19.0, issues are reported without a file and line.
+
+`buildReport()`, `formatText()`, `formatMarkdown()` and `formatGithub()` are exported for custom tooling, along with the `Report` type. The JSON has a `version` field, currently `1`.
 
 ## Limitations
 

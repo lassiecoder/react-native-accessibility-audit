@@ -2,6 +2,7 @@ import * as path from 'path';
 
 import { audit, resolveRoot } from './audit';
 import { baselinePath, compareToBaseline, countFingerprints, readBaseline, writeBaseline } from './baseline';
+import { isRecording, recordAudit, toRecorded } from './collector';
 import { formatViolations } from './format';
 import { isReactElement, renderElement } from './render-element';
 import type { MatcherOptions, Violation } from './types';
@@ -65,28 +66,44 @@ function check(context: MatcherContext, hint: string, target: unknown, options: 
     console.warn(`toBeAccessible() found ${count(warnings.length, 'accessibility warning')}:\n\n${formatViolations(warnings)}`);
   }
 
+  let result: MatcherResult;
+  let baselined = new Set<Violation>();
   if (baseline !== undefined) {
-    return matchBaseline(context, hint, baseline, errors);
+    ({ result, baselined } = matchBaseline(context, hint, baseline, errors));
+  } else {
+    const pass = errors.length === 0;
+    const message = pass
+      ? `${hint}\n\nExpected accessibility violations, but found none.`
+      : `${hint}\n\nFound ${count(errors.length, 'accessibility violation')}:\n\n${formatViolations(errors)}`;
+    result = { pass, message: () => message };
   }
 
-  const pass = errors.length === 0;
-  const message = pass
-    ? `${hint}\n\nExpected accessibility violations, but found none.`
-    : `${hint}\n\nFound ${count(errors.length, 'accessibility violation')}:\n\n${formatViolations(errors)}`;
-  return { pass, message: () => message };
+  // .not.toBeAccessible() asserts that violations exist; those aren't findings.
+  if (isRecording() && !context.isNot) {
+    recordAudit({
+      testFile: context.testPath,
+      testName: context.currentTestName,
+      baseline: baseline === true ? context.currentTestName : baseline,
+      passed: result.pass,
+      violations: violations.map((v) => toRecorded(v, baselined.has(v))),
+    });
+  }
+  return result;
 }
 
+/** The matcher result, and which errors the baseline covers. */
 function matchBaseline(
   context: MatcherContext,
   hint: string,
   baseline: string | true,
   errors: Violation[],
-): MatcherResult {
+): { result: MatcherResult; baselined: Set<Violation> } {
+  const none = new Set<Violation>();
   const name = baseline === true ? context.currentTestName : baseline;
   if (!context.testPath || !name) {
     return {
-      pass: false,
-      message: () => `${hint}\n\nBaselines need a Jest test context (test file path and test name).`,
+      result: { pass: false, message: () => `${hint}\n\nBaselines need a Jest test context (test file path and test name).` },
+      baselined: none,
     };
   }
 
@@ -97,15 +114,21 @@ function matchBaseline(
 
   if (mode === 'all' || (recorded === undefined && mode === 'new')) {
     writeBaseline(file, name, countFingerprints(errors));
-    return { pass: true, message: () => `${hint}\n\nRecorded accessibility baseline "${name}".` };
+    return {
+      result: { pass: true, message: () => `${hint}\n\nRecorded accessibility baseline "${name}".` },
+      baselined: new Set(errors),
+    };
   }
 
   if (recorded === undefined) {
     return {
-      pass: false,
-      message: () =>
-        `${hint}\n\nNo accessibility baseline "${name}" in ${relative}.\n` +
-        'Baselines are not written with --ci. Run the tests locally to record it, then commit the file.',
+      result: {
+        pass: false,
+        message: () =>
+          `${hint}\n\nNo accessibility baseline "${name}" in ${relative}.\n` +
+          'Baselines are not written with --ci. Run the tests locally to record it, then commit the file.',
+      },
+      baselined: none,
     };
   }
 
@@ -115,13 +138,17 @@ function matchBaseline(
 
   const pass = added.length === 0;
   const knownNote = known > 0 ? ` (${count(known, 'known violation')} in the baseline still ${known === 1 ? 'needs' : 'need'} fixing)` : '';
+  const addedSet = new Set(added);
   return {
-    pass,
-    message: () =>
-      pass
-        ? `${hint}\n\nExpected new accessibility violations compared to baseline "${name}", but found none.`
-        : `${hint}\n\nFound ${count(added.length, 'new accessibility violation')} not in baseline "${name}"${knownNote}:\n\n` +
-          `${formatViolations(added)}\n\nFix them, or run Jest with -u to accept them into ${relative}.`,
+    result: {
+      pass,
+      message: () =>
+        pass
+          ? `${hint}\n\nExpected new accessibility violations compared to baseline "${name}", but found none.`
+          : `${hint}\n\nFound ${count(added.length, 'new accessibility violation')} not in baseline "${name}"${knownNote}:\n\n` +
+            `${formatViolations(added)}\n\nFix them, or run Jest with -u to accept them into ${relative}.`,
+    },
+    baselined: new Set(errors.filter((e) => !addedSet.has(e))),
   };
 }
 

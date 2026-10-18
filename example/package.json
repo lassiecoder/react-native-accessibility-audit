@@ -33,6 +33,16 @@
     "preset": "jest-expo",
     "setupFilesAfterEnv": [
       "react-native-accessibility-audit"
+    ],
+    "reporters": [
+      "default",
+      [
+        "react-native-accessibility-audit/reporter",
+        {
+          "outputFile": "a11y-report.json",
+          "markdownFile": "a11y-report.md"
+        }
+      ]
     ]
   }
 }
