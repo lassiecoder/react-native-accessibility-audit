@@ -113,7 +113,7 @@ Found 2 accessibility violations:
    Fix: Set accessibilityState={{ checked }} (or aria-checked) on checkboxes, radios, switches and toggle buttons; ...
 ```
 
-Content hidden from screen readers (`aria-hidden`, `accessibilityElementsHidden`, `importantForAccessibility="no-hide-descendants"`, `display: 'none'`) is not audited.
+Content hidden from screen readers on both platforms (`aria-hidden`, `display: 'none'`, or `accessibilityElementsHidden` together with `importantForAccessibility="no-hide-descendants"`) is not audited. Content hidden on only one platform still is, because the other platform's screen reader reads it.
 
 ## Rules
 
@@ -126,15 +126,34 @@ Errors fail the test. Warnings are printed but don't fail it, because they depen
 | [input-label-required](docs/rules.md#input-label-required) | error | text inputs and sliders have a label (a placeholder isn't one) |
 | [interactive-accessible-required](docs/rules.md#interactive-accessible-required) | error | pressable elements aren't hidden from screen readers with `accessible={false}` |
 | [image-label-required](docs/rules.md#image-label-required) | error | images have a label or are marked as decorative |
-| [no-nested-interactive](docs/rules.md#no-nested-interactive) | error | pressable elements aren't nested inside other pressable elements |
+| [no-nested-interactive](docs/rules.md#no-nested-interactive) | error | pressable elements aren't nested inside other pressable elements or `accessible` groups |
 | [state-required](docs/rules.md#state-required) | error | checkboxes, radios and switches expose `checked`; sliders expose a value |
 | [adjustable-role-required](docs/rules.md#adjustable-role-required) | error | controls with `increment` / `decrement` actions have an adjustable role, and native sliders keep theirs |
+| [role-valid](docs/rules.md#role-valid) | error | `role` and `accessibilityRole` values are ones React Native supports |
+| [accessibility-actions-valid](docs/rules.md#accessibility-actions-valid) | error | accessibility actions have names, labels for custom actions, and a handler |
 | [link-role-misused](docs/rules.md#link-role-misused) | error | the `link` role is only used on something that can be pressed |
 | [no-empty-text](docs/rules.md#no-empty-text) | error | `Text` elements aren't empty |
+| [consistent-hiding](docs/rules.md#consistent-hiding) | error | content hidden from screen readers is hidden on both iOS and Android |
+| [modal-hides-background](docs/rules.md#modal-hides-background) | error | content behind an `aria-modal` view is hidden from TalkBack and VoiceOver |
+| [no-disabled-font-scaling](docs/rules.md#no-disabled-font-scaling) | error | text isn't prevented from growing with the system font size |
 | [touch-target-size](docs/rules.md#touch-target-size) | warning | touch targets are at least 44×44 (when the size is set in styles) |
-| [text-contrast](docs/rules.md#text-contrast) | warning | text meets WCAG AA contrast (when both colors are set in styles) |
+| [text-contrast](docs/rules.md#text-contrast) | warning | text, input text and placeholders meet WCAG AA contrast (when colors are set in styles) |
+| [no-nested-text-link](docs/rules.md#no-nested-text-link) | warning | pressable text isn't nested inside a paragraph, where VoiceOver can't focus it |
 
 Each rule's page has failing and passing examples.
+
+### Supported components
+
+The rules read host elements, so any component built on React Native's `View`, `Text`, `Image`, `TextInput`, `Pressable` or `Touchable*` is covered, including most UI kits. Libraries that render their own native elements are recognized explicitly:
+
+| Library | Components |
+| --- | --- |
+| `expo-image` | `Image` |
+| `expo-symbols` | `SymbolView` |
+| `react-native-gesture-handler` | `RectButton`, `BorderlessButton`, `BaseButton`, `Pressable` |
+| `@react-native-community/slider` | `Slider` |
+
+For gesture-handler buttons, the role and label can be on the button or on an `accessible` child `View`, as gesture-handler's docs recommend.
 
 ## Options
 
@@ -242,7 +261,18 @@ The library checks the tree React Native Testing Library renders in Node. That's
 - **Mocked native components.** Jest presets mock native views, so components that render native UI (maps, video, `@expo/ui`) expose only the props passed to the mock.
 - **Component names use a React internal.** The "in LoginScreen" part of messages and `ignore.components` read React's fiber through test-renderer's `unstable_fiber`. If a future React version changes it, messages lose component names and `ignore.components` stops matching. Nothing crashes, and the rules themselves don't depend on it.
 
-It doesn't replace testing with VoiceOver and TalkBack. It catches the common, mechanical mistakes before they ship.
+### What needs a device
+
+Some of the most common accessibility bugs in React Native apps can't be seen in a rendered tree. Test these with VoiceOver and TalkBack:
+
+- **Focus order**: the order the screen reader moves through elements, especially in grids, rows and absolutely positioned layouts.
+- **Focus after navigation**: where focus lands after a screen change, and whether the previous screen is still announced.
+- **Text at large sizes**: whether layouts clip or overlap at the largest Dynamic Type and font scale settings. `no-disabled-font-scaling` only checks that scaling isn't turned off.
+- **Reduce Motion**: whether animations respect the setting, and whether content still appears with it on.
+- **Announcements**: whether toasts, loading states and form errors are announced (`accessibilityLiveRegion`, `AccessibilityInfo.announceForAccessibility`).
+- **Bugs in React Native or native libraries**, where the props are correct but a platform doesn't honor them.
+
+The library catches the common, mechanical mistakes before they ship. It doesn't replace testing with the screen readers themselves.
 
 ## Migrating from react-native-accessibility-engine
 

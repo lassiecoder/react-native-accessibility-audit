@@ -73,7 +73,8 @@ The new rules catch issues the old engine didn't:
 - `input-label-required`: text inputs and sliders without a label, including inputs that only have a placeholder
 - `image-label-required`: images that are neither labelled nor marked decorative
 - `no-nested-interactive`: buttons inside buttons
-- `touch-target-size` and `text-contrast`: printed as warnings, don't fail tests
+- `role-valid`, `accessibility-actions-valid`, `consistent-hiding`, `modal-hides-background` and `no-disabled-font-scaling`: mistakes the old engine didn't look for
+- `touch-target-size`, `text-contrast` and `no-nested-text-link`: printed as warnings, don't fail tests
 
 Detection is also broader. Any element that handles presses is checked, not only the components the old engine recognized by name. And `aria-labelledby` / `accessibilityLabelledBy` alone no longer count as a label, because React Native supports them only on Android.
 

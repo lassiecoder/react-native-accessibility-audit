@@ -13,11 +13,13 @@ First release. Not yet published to npm.
 
 ### Rules
 
-- Errors: `interactive-role-required`, `interactive-label-required`, `input-label-required`, `interactive-accessible-required`, `image-label-required`, `no-nested-interactive`, `state-required`, `adjustable-role-required`, `link-role-misused`, `no-empty-text`.
-- `input-label-required` checks `TextInput` and native sliders; a placeholder alone isn't a label.
+- Errors: `interactive-role-required`, `interactive-label-required`, `input-label-required`, `interactive-accessible-required`, `image-label-required`, `no-nested-interactive`, `state-required`, `adjustable-role-required`, `role-valid`, `accessibility-actions-valid`, `link-role-misused`, `no-empty-text`, `consistent-hiding`, `modal-hides-background`, `no-disabled-font-scaling`.
+- Warnings: `touch-target-size` (`minTouchTarget` option, default 44), `text-contrast` (WCAG AA, including `TextInput` placeholders and input text) and `no-nested-text-link`. The first two are checked only when sizes and colors are known from styles.
+- Hiding is platform-aware: `accessibilityElementsHidden` (iOS) and `importantForAccessibility` (Android) each hide on one platform only, so content hidden with just one of them is still audited and reported by `consistent-hiding`.
 - `aria-labelledby` / `accessibilityLabelledBy` alone don't count as a label (Android-only in React Native); the failure message says so.
+- `no-nested-interactive` also reports controls inside `accessible={true}` groups, which VoiceOver can't reach.
 - `adjustable-role-required` checks custom controls with `increment` / `decrement` actions and conflicting roles on native sliders. Native sliders without a role pass, unlike in react-native-accessibility-engine.
-- Warnings: `touch-target-size` (`minTouchTarget` option, default 44) and `text-contrast` (WCAG AA), checked when sizes and colors are known from styles.
+- Recognizes `expo-image`, `expo-symbols`, `react-native-gesture-handler` buttons (including the accessible-child pattern) and `@react-native-community/slider`; messages name the library component.
 
 ### Configuration
 
