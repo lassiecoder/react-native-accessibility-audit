@@ -153,7 +153,7 @@ The rules read host elements, so any component built on React Native's `View`, `
 | `react-native-gesture-handler` | `RectButton`, `BorderlessButton`, `BaseButton`, `Pressable` |
 | `@react-native-community/slider` | `Slider` |
 
-For gesture-handler buttons, the role and label can be on the button or on an `accessible` child `View`, as gesture-handler's docs recommend.
+For gesture-handler buttons, the role and label can be on the button or on an `accessible` child `View`, as gesture-handler's docs recommend. This applies to gesture-handler 3. gesture-handler 2's Jest setup mocks its buttons as React Native touchables, so they're checked as touchables, and the mock replaces an accessible child's role and label with the button's own.
 
 ## Options
 

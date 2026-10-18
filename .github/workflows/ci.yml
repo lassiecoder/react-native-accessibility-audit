@@ -56,4 +56,5 @@ jobs:
       # RN 0.78 predates @react-native/jest-preset; it ships the 'react-native' preset.
       - run: npm uninstall @react-native/jest-preset
       - run: npm install --no-save react@19.0.0 react-native@0.78.3 @react-native/babel-preset@0.78.3 jest@^29 @types/jest@^29
-      - run: npx jest --ci --preset react-native
+      # third-party.test.tsx targets gesture-handler 3, which needs a newer React Native codegen.
+      - run: npx jest --ci --preset react-native --testPathIgnorePatterns third-party
