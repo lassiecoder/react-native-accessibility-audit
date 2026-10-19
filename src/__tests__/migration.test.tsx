@@ -194,3 +194,93 @@ describe('react-native-accessibility-engine issues', () => {
     expect(<Tabs />).toBeAccessible();
   });
 });
+
+describe('more react-native-accessibility-engine issues', () => {
+  // #105: tests passed render(...).toJSON() to the matcher.
+  test('#105 audits toJSON() output, including rules that need parents', async () => {
+    const result = await render(
+      <View>
+        <Pressable onPress={noop} accessibilityRole="button">
+          <Pressable onPress={noop} accessibilityRole="button">
+            <Text>Inner</Text>
+          </Pressable>
+        </Pressable>
+        <Text />
+      </View>,
+    );
+    expect(audit(result.toJSON()).map((v) => v.ruleId)).toEqual(['no-nested-interactive', 'no-empty-text']);
+    expect(result.toJSON()).not.toBeAccessible();
+  });
+
+  test('#105 accepts toJSON() output with several roots', async () => {
+    function Fragmented() {
+      return (
+        <>
+          <Text>One</Text>
+          <Text />
+        </>
+      );
+    }
+    // RNTL v14 returns the container node for several roots; other renderers return an array.
+    const json = (await render(<Fragmented />)).toJSON() as { type: string; children: unknown[] };
+    expect(json.type).toBe('');
+    expect(audit(json).map((v) => v.ruleId)).toEqual(['no-empty-text']);
+    expect(audit(json.children).map((v) => v.ruleId)).toEqual(['no-empty-text']);
+  });
+
+  // #314: a checkbox Pressable with role and state was rejected by an allow-list of roles.
+  test('#314 accepts a checkbox Pressable with role, label and state', () => {
+    function Checkbox({ value }: { value: boolean }) {
+      return (
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityLabel="Subscribe"
+          accessibilityState={{ checked: value, disabled: false }}
+          testID="subscribe"
+          onPress={noop}
+        >
+          <View />
+        </Pressable>
+      );
+    }
+    expect(<Checkbox value={false} />).toBeAccessible();
+  });
+
+  // #128: radios inside a radiogroup were flagged as needing a button role.
+  test('#128 accepts radios in a radiogroup once they expose checked', () => {
+    const group = (checked: boolean | undefined) => (
+      <View accessibilityRole="radiogroup">
+        {['Alpha', 'Beta'].map((label) => (
+          <Pressable key={label} accessibilityRole="radio" accessibilityState={{ checked }} onPress={noop}>
+            <Text>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    );
+    expect(group(false)).toBeAccessible();
+    // Without checked, screen readers can't tell which option is selected.
+    expect(group(undefined)).not.toBeAccessible();
+  });
+
+  // #256: a role set on a custom component that doesn't forward it to the Pressable.
+  test('#256 names the component when a role is not forwarded to the Pressable', () => {
+    function StyledTag({ children }: { children: React.ReactNode; accessibilityRole?: string }) {
+      return <Pressable onPress={noop}>{children}</Pressable>;
+    }
+    function TagRemovable() {
+      return (
+        <StyledTag accessibilityRole="button">
+          <Text>Remove tag</Text>
+        </StyledTag>
+      );
+    }
+    let message = '';
+    try {
+      expect(<TagRemovable />).toBeAccessible();
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain('[interactive-role-required]');
+    expect(message).toContain('Pressable → <View> name="Remove tag" in StyledTag');
+  });
+});

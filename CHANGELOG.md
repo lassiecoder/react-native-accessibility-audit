@@ -40,3 +40,4 @@ First release.
 - `rules` array form and the engine's rule IDs; unknown IDs throw.
 - `customViolationHandler` option, `__A11Y_RULES__` and `__CUSTOM_VIOLATION_HANDLER__` globals.
 - Clear error when given a react-test-renderer tree.
+- `render(...).toJSON()` output is accepted (react-native-accessibility-engine#105), rebuilt with parent links so every rule works.

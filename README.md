@@ -97,7 +97,9 @@ test('icon button', () => {
 });
 ```
 
-React elements are rendered synchronously, audited, and unmounted again, so you don't need `render()` for small components.
+React elements are rendered synchronously, audited, and unmounted again, so you don't need `render()` for small components. Effects run before the audit, but asynchronous work (data fetching, timers, images loading) isn't awaited. For screens that settle asynchronously, render them with `render()`, wait with `await screen.findBy…`, then audit `screen.root`.
+
+`render(...).toJSON()` output is accepted too, for tests written for react-native-accessibility-engine. JSON snapshots don't record which component rendered an element, so failure messages and reports can't include component names or source locations; pass `screen.root` to get them.
 
 When a check fails, the output names the rule, the element, the component that rendered it, and how to fix it:
 

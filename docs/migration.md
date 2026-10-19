@@ -39,6 +39,7 @@ For TypeScript, replace `import 'react-native-accessibility-engine'` in your set
 | --- | --- |
 | `expect(<Component />).toBeAccessible()` | Works. The element is rendered, audited and unmounted. |
 | `expect(getByRole('button')).toBeAccessible()` (RNTL) | Works. Add `await` to the `render()` call for RNTL v14. |
+| `expect(render(<C />).toJSON()).toBeAccessible()` | Works. Messages can't name components for JSON input; pass `screen.root` to get them. |
 | `toBeAccessible({ rules: ['no-empty-text'] })` | Works. An array still means "run only these rules". |
 | `toBeAccessible({ customViolationHandler })` | Works. |
 | `global.__A11Y_RULES__` / Jest `globals: { __A11Y_RULES__ }` | Works. |
@@ -102,9 +103,13 @@ configure({ ignore: { components: ['MapView'], testIDs: ['ad-banner'] } });
 | --- | --- |
 | [#317](https://github.com/aryella-lacerda/react-native-accessibility-engine/pull/317) React 19 / unmounted test renderer | Built on RNTL v14 and test-renderer |
 | [#315](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/315) Jest can't exit (open handle) | Importing the package loads no renderer. test-renderer is loaded only when you pass a React element, and that element is unmounted after the audit. |
+| [#105](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/105) Audit `toJSON()` output | Supported, including rules that look at parent elements |
+| [#128](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/128), [#314](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/314) Radio and checkbox roles rejected on Pressables | Any interactive role is accepted; `state-required` checks that radios and checkboxes expose `checked` |
+| [#256](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/256) Role set on a custom component still reported, with a confusing path | Messages name the component that rendered the Pressable (e.g. `in StyledTag`), which shows where the role needs to be forwarded |
+| [#257](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/257) Crash from a bundled react-test-renderer version | No renderer is bundled; test-renderer is loaded from your project |
 | [#145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145) Exclude third-party components | `ignore` option |
 | [#255](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/255) CLI listing components without accessibility, clickable first | Jest reporter and `report` / `baselines` CLI commands, with file and line for each issue |
 | [#258](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/258) Label rule doesn't find text in nested views | Text is read from the whole rendered subtree, including nested `accessible` views and labelled images |
 | [#307](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/307) `tab` role rejected; carousels required a disabled state | Any interactive role is accepted; there is no disabled-state rule, and slides hidden with `accessibilityElementsHidden` / `importantForAccessibility` are skipped |
 
-The cases from #258 and #307 are regression tests in `src/__tests__/migration.test.tsx`.
+The cases from #105, #128, #256, #258, #307 and #314 are regression tests in `src/__tests__/migration.test.tsx`, built from the code in each issue.
