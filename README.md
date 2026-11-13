@@ -490,6 +490,8 @@ npm install
 npm test
 ```
 
+`@emnapi/core` and `@emnapi/runtime` are dev dependencies only so that `npm ci` works on Linux: npm on macOS leaves them out of the lockfile, although Jest's resolver needs them on other platforms. Keep them when updating dependencies.
+
 The example app's `BrokenLoginScreen` has one example of each kind of issue the rules catch. `npx react-native-accessibility-audit scan` in `example/` shows the static scan on it.
 
 ## License
