@@ -1,0 +1,124 @@
+name: React Native Accessibility Audit
+description: Annotate pull requests with accessibility issues found by react-native-accessibility-audit, and post a summary comment.
+author: Priyanka Sharma
+branding:
+  icon: eye
+  color: blue
+
+# Runs after your Jest step. The project must have react-native-accessibility-audit
+# installed and the reporter enabled, so the action uses your installed version.
+#
+#   - run: npx jest --ci
+#   - uses: lassiecoder/react-native-accessibility-audit@v0.1.0
+#     if: always()
+#
+# The pull request comment needs `permissions: pull-requests: write`.
+
+inputs:
+  report:
+    description: Path to the JSON report written by the Jest reporter.
+    default: a11y-report.json
+  working-directory:
+    description: Directory of the React Native project (where package.json and the report are).
+    default: .
+  fail-on:
+    description: Fail the step on `error` (unbaselined errors), `warn` (errors or warnings) or `none`.
+    default: none
+  include-baselined:
+    description: Also annotate baselined issues, as notices.
+    default: 'false'
+  scan:
+    description: Also run the static source scan and list component files no test audits.
+    default: 'true'
+  comment:
+    description: Post (and update) one summary comment on the pull request.
+    default: 'true'
+  github-token:
+    description: Token for the pull request comment.
+    default: ${{ github.token }}
+
+outputs:
+  errors:
+    description: Unbaselined errors in the report.
+    value: ${{ steps.audit.outputs.errors }}
+  warnings:
+    description: Warnings in the report.
+    value: ${{ steps.audit.outputs.warnings }}
+
+runs:
+  using: composite
+  steps:
+    - id: audit
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REPORT: ${{ inputs.report }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        INCLUDE_BASELINED: ${{ inputs.include-baselined }}
+        SCAN: ${{ inputs.scan }}
+      run: |
+        set -euo pipefail
+        cli="npx --no-install react-native-accessibility-audit"
+        if [ ! -f "$REPORT" ]; then
+          echo "::warning title=Accessibility report missing::No $REPORT. Add 'react-native-accessibility-audit/reporter' to Jest's reporters and run Jest before this step."
+          exit 0
+        fi
+
+        flags=()
+        if [ "$INCLUDE_BASELINED" = "true" ]; then flags+=(--include-baselined); fi
+        $cli report "$REPORT" --format github ${flags[@]+"${flags[@]}"}
+
+        body="$RUNNER_TEMP/a11y-comment.md"
+        {
+          echo "<!-- react-native-accessibility-audit -->"
+          $cli report "$REPORT" --format markdown
+          if [ "$SCAN" = "true" ]; then
+            echo
+            echo "<details><summary>Static scan</summary>"
+            echo
+            $cli scan . --report "$REPORT" --format markdown | sed '1,2d'
+            echo
+            echo "</details>"
+          fi
+        } > "$body.full"
+        # GitHub limits comments to 65536 characters.
+        if [ "$(wc -c < "$body.full")" -gt 60000 ]; then
+          head -c 60000 "$body.full" > "$body"
+          printf '\n\n_Truncated. The full report is in the job summary and %s._\n' "$REPORT" >> "$body"
+        else
+          cp "$body.full" "$body"
+        fi
+        cat "$body.full" >> "$GITHUB_STEP_SUMMARY"
+        echo "body=$body" >> "$GITHUB_OUTPUT"
+
+        node -e '
+          const r = require(require("path").resolve(process.argv[1]));
+          console.log(`errors=${r.summary.errors}`);
+          console.log(`warnings=${r.summary.warnings}`);
+        ' "$REPORT" >> "$GITHUB_OUTPUT"
+
+    - if: inputs.comment == 'true' && github.event.pull_request.number && steps.audit.outputs.body
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ github.event.pull_request.number }}
+        BODY: ${{ steps.audit.outputs.body }}
+      run: |
+        set -euo pipefail
+        marker="<!-- react-native-accessibility-audit -->"
+        id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1 || true)
+        if [ -n "$id" ]; then
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$BODY" > /dev/null
+        else
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F "body=@$BODY" > /dev/null \
+            || echo "::warning::Could not comment on the pull request. Give the job 'pull-requests: write' permission, or set comment: false."
+        fi
+
+    - if: inputs.fail-on != 'none' && steps.audit.outputs.body
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REPORT: ${{ inputs.report }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: npx --no-install react-native-accessibility-audit report "$REPORT" --format json --fail-on "$FAIL_ON" > /dev/null

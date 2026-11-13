@@ -1,4 +1,5 @@
 import { loadFromProject } from './project';
+import { libraryOrigin } from './source';
 import type { HostNode } from './types';
 
 // test-renderer exposes the React fiber as `unstable_fiber`. It is the only
@@ -9,6 +10,23 @@ import type { HostNode } from './types';
 interface FiberLike {
   type: unknown;
   return: FiberLike | null;
+  /** The component whose render created this element (React development builds). */
+  _debugOwner?: FiberLike | null;
+}
+
+/**
+ * The nearest app component in the owner chain: the component whose render
+ * created `fiber`'s element, skipping React Native's and `skip`'s components.
+ * Undefined when React doesn't record owners.
+ */
+function ownerComponent(fiber: FiberLike | null | undefined, skip?: Set<string>): string | undefined {
+  let owner = fiber?._debugOwner;
+  for (let depth = 0; owner && depth < 100; depth++, owner = owner._debugOwner) {
+    const name = componentName(owner.type);
+    if (!name || skip?.has(name) || isReactNativeComponent(owner.type, name) || isInternalName(name)) continue;
+    return name;
+  }
+  return undefined;
 }
 
 // Composite components that come from React Native itself.
@@ -105,13 +123,26 @@ export function ownComponentNames(node: HostNode): string[] {
   return names;
 }
 
+export interface Owners {
+  /** The React Native or library component the user wrote, e.g. "Pressable" or "gesture-handler RectButton". */
+  rn?: string;
+  /** The nearest component from the app's own code, e.g. "LoginScreen". */
+  user?: string;
+  /**
+   * Set when a library's own code rendered the element (a navigator's tab
+   * label, a dropdown's trigger), so the app can't change its props directly.
+   * `component` is the library component the app used, e.g. "Dropdown".
+   */
+  library?: { package: string; component?: string; packages: string[] };
+}
+
 /**
  * The component that rendered `node` as the user knows it (e.g. Pressable,
  * or "gesture-handler RectButton") and the nearest user component (e.g.
- * LoginScreen).
+ * LoginScreen), or the library that rendered it.
  */
-export function describeOwners(node: HostNode): { rn?: string; user?: string } {
-  const result: { rn?: string; user?: string } = {};
+export function describeOwners(node: HostNode): Owners {
+  const result: Owners = {};
   try {
     let fiber = (node.unstable_fiber as FiberLike | null | undefined)?.return ?? null;
     const lib = LIBRARY_HOSTS[node.type];
@@ -132,6 +163,31 @@ export function describeOwners(node: HostNode): { rn?: string; user?: string } {
       fiber = fiber.return;
     }
     if (lib) result.rn = outermostLibraryComponent ? `${lib.library} ${outermostLibraryComponent}` : lib.library;
+    // The owner chain names the component whose code created the element,
+    // even when library components (providers, layout wrappers) sit between
+    // them in the tree. The parent walk above is the fallback.
+    const host = node.unstable_fiber as FiberLike | null | undefined;
+    if (host && '_debugOwner' in host) {
+      const owner = ownerComponent(host, lib?.components);
+      if (owner) result.user = owner;
+    }
+    // Known library hosts (gesture-handler buttons, expo-image) take their
+    // props from the app's code. Anything else a package created itself is
+    // the package's, and the nearest named component is the package's too.
+    const origin = lib ? undefined : libraryOrigin(node);
+    if (origin?.packages.length) {
+      // The outermost package is the one the app imported; the entry fiber is
+      // the element the app created, and its owner is the app's component.
+      const entry = origin.entry as FiberLike | undefined;
+      result.library = {
+        package: origin.outer ?? origin.packages[origin.packages.length - 1],
+        component: entry ? componentName(entry.type) : undefined,
+        packages: origin.packages,
+      };
+      delete result.user;
+      const user = entry ? ownerComponent(entry) : undefined;
+      if (user) result.user = user;
+    }
   } catch {
     // See note at the top of the file.
   }

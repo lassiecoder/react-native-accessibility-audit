@@ -20,6 +20,14 @@ const TEXT_INPUT_TYPES = new Set(['TextInput', 'RCTSinglelineTextInputView', 'RC
 // RectButton, BorderlessButton and Pressable from react-native-gesture-handler.
 const GESTURE_BUTTON_TYPES = new Set(['RNGestureHandlerButton']);
 
+// React Native's Modal: 'Modal' under the Jest preset, RCTModalHostView natively.
+const NATIVE_MODAL_TYPES = new Set(['Modal', 'RCTModalHostView']);
+
+/** React Native's Modal, which shows its content in a separate native window. */
+export function isNativeModal(node: HostNode): boolean {
+  return NATIVE_MODAL_TYPES.has(node.type);
+}
+
 export function isHostNode(value: unknown): value is HostNode {
   return (
     typeof value === 'object' &&

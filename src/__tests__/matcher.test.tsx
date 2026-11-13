@@ -90,3 +90,17 @@ test('per-call options override global config', async () => {
   expect(screen.container).toBeAccessible();
   expect(screen.container).not.toBeAccessible({ rules: { 'image-label-required': 'error' } });
 });
+
+test('failure message names the WCAG criterion and EN 301 549 clause', async () => {
+  await render(<SettingsRow />);
+  let message = '';
+  try {
+    expect(screen.container).toBeAccessible();
+  } catch (e) {
+    message = (e as Error).message;
+  }
+  expect(message).toContain('Standard: WCAG 4.1.2 Name, Role, Value (A) · EN 301 549 11.4.1.2');
+  expect(message).toContain('Standard: WCAG 1.1.1 Non-text Content (A) · EN 301 549 11.1.1.1');
+  expect(message).toContain('Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#image-label-required');
+  expect(message).not.toContain('Library:');
+});

@@ -52,6 +52,8 @@ describe('recording', () => {
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ testFile: __filename, passed: false });
     const line = (n: number) => (hasOwnerStacks ? n : undefined);
+    expect(records[0].files).toEqual(hasOwnerStacks ? [fixture] : []);
+    expect(records[0].violations[0].wcag).toEqual(['4.1.2']);
     expect(records[0].violations.map((v) => [v.ruleId, v.source?.line, v.component, v.baselined])).toEqual([
       ['interactive-role-required', line(9), 'ProbeScreen', false],
       ['interactive-label-required', line(9), 'ProbeScreen', false],
@@ -164,6 +166,31 @@ describe('buildReport', () => {
   });
 });
 
+test('buildReport counts issues per WCAG criterion and collects coverage', () => {
+  const report = buildReport(
+    [
+      record({
+        files: ['/app/src/Login.tsx', '/app/node_modules/lib/index.js'],
+        violations: [
+          violation('image-label-required', 2, { wcag: ['1.1.1'] }),
+          violation('input-label-required', 3, { wcag: ['3.3.2', '4.1.2'] }),
+          violation('interactive-label-required', 4, { wcag: ['4.1.2'] }),
+        ],
+      }),
+      record({ files: ['/app/src/Login.tsx', '/app/src/Card.tsx'], violations: [] }),
+    ],
+    '/app',
+  );
+  expect(report.byCriterion).toEqual([
+    { wcag: '1.1.1', name: 'Non-text Content', level: 'A', en301549: '11.1.1.1', issues: 1 },
+    { wcag: '3.3.2', name: 'Labels or Instructions', level: 'A', en301549: '11.3.3.2', issues: 1 },
+    { wcag: '4.1.2', name: 'Name, Role, Value', level: 'A', en301549: '11.4.1.2', issues: 2 },
+  ]);
+  expect(report.coverage.files).toEqual(['src/Card.tsx', 'src/Login.tsx']);
+  expect(formatMarkdown(report)).toContain('| 4.1.2 Name, Role, Value | A | 11.4.1.2 | 2 |');
+  expect(formatText(report)).toContain('WCAG 3.3.2, 4.1.2');
+});
+
 describe('formatters', () => {
   const report = buildReport(
     [record({ violations: [violation('interactive-label-required', 9, { message: 'Needs a label, really\n100%' })] })],
@@ -176,12 +203,14 @@ describe('formatters', () => {
   });
 
   test('markdown is a checklist', () => {
-    expect(formatMarkdown(report)).toContain('## src/Login.tsx\n\n- [ ] line 9: **interactive-label-required** (error)');
+    expect(formatMarkdown(report)).toContain(
+      '## src/Login.tsx\n\n- [ ] line 9: **[interactive-label-required](https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-label-required)** (error)',
+    );
   });
 
   test('github annotations are escaped', () => {
     expect(formatGithub(report)).toBe(
-      '::error file=src/Login.tsx,line=9,col=3,title=interactive-label-required::Needs a label, really%0A100%25 <View>. Fix: help',
+      '::error file=src/Login.tsx,line=9,col=3,title=interactive-label-required::Needs a label, really%0A100%25 <View>. Fix: help Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-label-required',
     );
   });
 });

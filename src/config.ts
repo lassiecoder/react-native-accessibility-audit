@@ -76,6 +76,7 @@ export function mergeOptions(base: ResolvedOptions | AuditOptions, override: Aud
     ignore: {
       testIDs: [...(a.testIDs ?? []), ...(b.testIDs ?? [])],
       components: [...(a.components ?? []), ...(b.components ?? [])],
+      packages: [...(a.packages ?? []), ...(b.packages ?? [])],
       elements: predicates.length ? (node) => predicates.some((p) => p(node)) : undefined,
     },
   };

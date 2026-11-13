@@ -67,6 +67,11 @@ export interface Rule {
   description: string;
   /** How to fix a violation, shown in failure output. */
   help: string;
+  /**
+   * WCAG 2.2 success criteria the rule checks, e.g. ['4.1.2']. Empty for
+   * best-practice rules. EN 301 549 clauses follow from these (clause 11.x).
+   */
+  wcag: readonly string[];
   /** Returns a problem description for `node`, or null when it passes. */
   check(node: HostNode, context: RuleContext): string | null;
 }
@@ -76,6 +81,8 @@ export interface Violation {
   severity: Severity;
   message: string;
   help: string;
+  /** WCAG 2.2 success criteria, copied from the rule. */
+  wcag: readonly string[];
   element: HostNode;
 }
 
@@ -90,6 +97,12 @@ export interface IgnoreOptions {
   testIDs?: Matcher[];
   /** Elements rendered directly by a matching component, e.g. 'MapView'. */
   components?: Matcher[];
+  /**
+   * npm packages whose own elements are skipped, e.g. 'react-native-maps' or
+   * /^@acme\//. Unlike `components`, content you pass into the library
+   * (carousel slides, list items) is still audited. Needs React 19.1+.
+   */
+  packages?: Matcher[];
   /** Custom predicate for anything the other options can't express. */
   elements?: (node: HostNode) => boolean;
 }

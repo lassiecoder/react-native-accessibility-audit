@@ -67,3 +67,25 @@ describe('expo-image and expo-symbols host types', () => {
     },
   );
 });
+
+describe('ignore.packages', () => {
+  test('skips elements a package renders, but still audits content passed into it', async () => {
+    await render(
+      <GestureHandlerRootView>
+        <RectButton onPress={noop}>
+          <Text />
+        </RectButton>
+        <Pressable onPress={noop} />
+      </GestureHandlerRootView>,
+    );
+    const all = audit(screen.container).map((v) => v.ruleId);
+    expect(all).toEqual(expect.arrayContaining(['interactive-role-required', 'no-empty-text']));
+
+    const [major, minor] = React.version.split('.').map(Number);
+    if (major === 19 && minor < 1) return; // needs owner stacks
+    const ignored = audit(screen.container, { ignore: { packages: ['react-native-gesture-handler'] } }).map((v) => v.ruleId);
+    // The RectButton's own issues are gone; the empty Text inside it and the app's Pressable remain.
+    expect(ignored).toEqual(['no-empty-text', 'interactive-role-required', 'interactive-label-required']);
+    expect(audit(screen.container, { ignore: { packages: [/^react-native-gesture/] } })).toHaveLength(3);
+  });
+});
