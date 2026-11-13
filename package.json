@@ -1,6 +1,6 @@
 {
   "name": "react-native-accessibility-audit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Accessibility testing for React Native and Expo: a toBeAccessible() Jest matcher (jest-axe for React Native), WCAG 2.2 / EN 301 549 mapped rules, baselines, project reports, a static scanner, a GitHub Action and an AI agent skill.",
   "license": "MIT",
   "author": "Priyanka Sharma",
