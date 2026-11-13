@@ -42,6 +42,13 @@ jobs:
         working-directory: example
       - run: npx jest --ci
         working-directory: example
+      - run: npx react-native-accessibility-audit scan
+        working-directory: example
+      # Runs this repository's action against the example's report.
+      - uses: ./
+        with:
+          working-directory: example
+          comment: 'false'
 
   oldest-supported:
     name: Oldest supported (RN 0.78, React 19.0, Jest 29)

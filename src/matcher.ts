@@ -5,6 +5,7 @@ import { baselinePath, compareToBaseline, countFingerprints, readBaseline, write
 import { isRecording, recordAudit, toRecorded } from './collector';
 import { formatViolations } from './format';
 import { isReactElement, renderElement } from './render-element';
+import { renderedFiles } from './source';
 import type { MatcherOptions, Violation } from './types';
 
 /** Jest's snapshot update mode: `-u` is 'all', default is 'new', `--ci` is 'none'. */
@@ -53,6 +54,7 @@ export function toBeAccessible(this: MatcherContext, received: unknown, options:
 function check(context: MatcherContext, hint: string, target: unknown, options: MatcherOptions): MatcherResult {
   const { baseline, customViolationHandler, ...auditOptions } = options;
   let violations = audit(target, auditOptions);
+  const root = resolveRoot(target);
   // react-native-accessibility-engine also read the handler from a Jest global.
   const handler =
     customViolationHandler ??
@@ -86,6 +88,7 @@ function check(context: MatcherContext, hint: string, target: unknown, options: 
       baseline: baseline === true ? context.currentTestName : baseline,
       passed: result.pass,
       violations: violations.map((v) => toRecorded(v, baselined.has(v))),
+      files: root ? renderedFiles(root).filter((f) => f !== context.testPath) : [],
     });
   }
   return result;

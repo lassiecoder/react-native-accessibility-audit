@@ -94,8 +94,10 @@ The old engine had no way to skip third-party components ([issue #145](https://g
 ```ts
 import { configure } from 'react-native-accessibility-audit';
 
-configure({ ignore: { components: ['MapView'], testIDs: ['ad-banner'] } });
+configure({ ignore: { packages: ['react-native-snap-carousel'], components: ['MapView'], testIDs: ['ad-banner'] } });
 ```
+
+`packages` skips what the library itself renders and keeps auditing content you pass into it, such as carousel slides.
 
 ## Fixed issues from react-native-accessibility-engine
 
@@ -107,9 +109,18 @@ configure({ ignore: { components: ['MapView'], testIDs: ['ad-banner'] } });
 | [#128](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/128), [#314](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/314) Radio and checkbox roles rejected on Pressables | Any interactive role is accepted; `state-required` checks that radios and checkboxes expose `checked` |
 | [#256](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/256) Role set on a custom component still reported, with a confusing path | Messages name the component that rendered the Pressable (e.g. `in StyledTag`), which shows where the role needs to be forwarded |
 | [#257](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/257) Crash from a bundled react-test-renderer version | No renderer is bundled; test-renderer is loaded from your project |
-| [#145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145) Exclude third-party components | `ignore` option |
-| [#255](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/255) CLI listing components without accessibility, clickable first | Jest reporter and `report` / `baselines` CLI commands, with file and line for each issue |
+| [#145](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/145) Exclude third-party components | `ignore` option, including `ignore.packages`, which skips a library's own elements but still audits content you pass into it |
+| [#255](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/255) CLI listing components without accessibility, clickable first | Jest reporter and `report` CLI command, controls first, with file and line for each issue; `scan` finds issues in source without running tests and lists component files no test audits |
 | [#258](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/258) Label rule doesn't find text in nested views | Text is read from the whole rendered subtree, including nested `accessible` views and labelled images |
 | [#307](https://github.com/aryella-lacerda/react-native-accessibility-engine/issues/307) `tab` role rejected; carousels required a disabled state | Any interactive role is accepted; there is no disabled-state rule, and slides hidden with `accessibilityElementsHidden` / `importantForAccessibility` are skipped |
 
 The cases from #105, #128, #256, #258, #307 and #314 are regression tests in `src/__tests__/migration.test.tsx`, built from the code in each issue.
+
+### Reported elsewhere
+
+| Issue | Status here |
+| --- | --- |
+| [react-native-element-dropdown#214](https://github.com/hoaphantn7604/react-native-element-dropdown/issues/214) Library internals failing the engine's checks | Still reported (they're real issues), but named as coming from the library, with the app component that used it and an `ignore.packages` suggestion. Tested in `example/src/__tests__/libraries.test.tsx`. |
+| [iNaturalistReactNative#1061](https://github.com/inaturalist/iNaturalistReactNative/issues/1061) Carousels need a disabled state to pass | No disabled-state rule; inactive slides hidden on both platforms are skipped (#307 regression test). |
+| [iNaturalistReactNative#308](https://github.com/inaturalist/iNaturalistReactNative/issues/308) `role="tab"` rejected | Any interactive role is accepted. |
+| Messages point at the wrong component when a screen is wrapped in providers or navigators | Component names follow React's owner chain (the component whose code created the element), not the closest wrapper. |

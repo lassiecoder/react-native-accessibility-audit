@@ -7,6 +7,8 @@ export { formatViolations } from './format';
 export { buildReport, formatGithub, formatMarkdown, formatText } from './report';
 export type { Report, ReportIssue } from './report';
 export { rules } from './rules';
+export { CRITERIA, criterionUrl, describeCriteria, enClause } from './wcag';
+export type { Criterion } from './wcag';
 export { toBeAccessible };
 export type {
   AuditOptions,

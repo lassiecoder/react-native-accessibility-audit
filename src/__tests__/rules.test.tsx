@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Button,
   Image,
+  Modal,
   Pressable,
   Switch,
   Text,
@@ -521,6 +522,18 @@ describe('modal-hides-background', () => {
       </View>
     )],
     ['modal rendered alone', dialog()],
+    // react-native-element-dropdown#214's fix: accessibilityViewIsModal inside React Native's Modal.
+    ['inside React Native\'s Modal, which is its own window', (
+      <View>
+        <Text>Inbox</Text>
+        <Modal visible>
+          <View>
+            <View />
+            {dialog()}
+          </View>
+        </Modal>
+      </View>
+    )],
     ['no aria-modal', <View><Text>Inbox</Text><View><Text>Panel</Text></View></View>],
   ])('passes %s', async (_, el) => {
     expect(await messagesFor(el, rule)).toEqual([]);

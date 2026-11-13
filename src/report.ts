@@ -2,6 +2,8 @@ import * as path from 'path';
 
 import type { AuditRecord } from './collector';
 import type { RuleId, Severity } from './types';
+import { ruleUrl } from './format';
+import { CRITERIA, describeCriteria, enClause } from './wcag';
 
 // Turns the per-audit records from a test run into a deduplicated, prioritized
 // list of issues: what react-native-accessibility-engine#255 asked for, a
@@ -14,6 +16,8 @@ export interface ReportIssue {
   severity: Severity;
   message: string;
   help: string;
+  /** WCAG 2.2 success criteria, e.g. ["4.1.2"]. Empty for best-practice rules. */
+  wcag: string[];
   element: string;
   component?: string;
   /** Relative to the project root. */
@@ -43,6 +47,14 @@ export interface Report {
     warnings: number;
   };
   byRule: Partial<Record<RuleId, number>>;
+  /** Issues per WCAG criterion, for compliance reporting (EN 301 549 clause 11.x). */
+  byCriterion: Array<{ wcag: string; name: string; level: string; en301549?: string; issues: number }>;
+  /**
+   * Source files that rendered at least one audited tree, relative to the
+   * project root. Lets `scan` list component files no test audits.
+   * Empty without React 19.1+.
+   */
+  coverage: { files: string[] };
   issues: ReportIssue[];
 }
 
@@ -94,6 +106,7 @@ export function buildReport(records: AuditRecord[], root: string, now = new Date
         severity: v.severity,
         message: v.message,
         help: v.help,
+        wcag: [...(v.wcag ?? [])],
         element: v.element,
         component: v.component,
         file,
@@ -108,6 +121,15 @@ export function buildReport(records: AuditRecord[], root: string, now = new Date
   const list = [...issues.values()].sort(compare);
   const byRule: Partial<Record<RuleId, number>> = {};
   for (const issue of list) byRule[issue.ruleId] = (byRule[issue.ruleId] ?? 0) + 1;
+  const byCriterion = new Map<string, number>();
+  for (const issue of list) for (const id of issue.wcag ?? []) byCriterion.set(id, (byCriterion.get(id) ?? 0) + 1);
+  const covered = new Set<string>();
+  for (const record of records) {
+    for (const file of record.files ?? []) {
+      const rel = relative(root, file);
+      if (rel && !rel.split('/').includes('node_modules')) covered.add(rel);
+    }
+  }
 
   return {
     version: REPORT_VERSION,
@@ -122,6 +144,16 @@ export function buildReport(records: AuditRecord[], root: string, now = new Date
       warnings: list.filter((i) => i.severity === 'warn').length,
     },
     byRule: Object.fromEntries(Object.entries(byRule).sort(([, a], [, b]) => b - a)),
+    byCriterion: [...byCriterion.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(([id, issues]) => ({
+        wcag: id,
+        name: CRITERIA[id]?.name ?? '',
+        level: CRITERIA[id]?.level ?? '',
+        en301549: enClause(id),
+        issues,
+      })),
+    coverage: { files: [...covered].sort() },
     issues: list,
   };
 }
@@ -160,16 +192,22 @@ function byFile(issues: ReportIssue[]): Array<[string, ReportIssue[]]> {
 }
 
 export function formatText(report: Report): string {
-  const lines = [summaryLine(report)];
-  for (const [file, issues] of byFile(report.issues)) {
+  return [summaryLine(report), ...issueLines(report.issues)].join('\n');
+}
+
+/** Issues grouped by file, as plain text lines. */
+export function issueLines(list: ReportIssue[]): string[] {
+  const lines: string[] = [];
+  for (const [file, issues] of byFile(list)) {
     lines.push('', file);
     for (const issue of issues) {
       const at = issue.line ? `${issue.line}:${issue.column}` : '';
       lines.push(`  ${at.padEnd(8)}${label(issue).padEnd(10)}${issue.ruleId}  ${issue.message}`);
       lines.push(`  ${''.padEnd(18)}${issue.element}`);
+      if (issue.wcag?.length) lines.push(`  ${''.padEnd(18)}WCAG ${issue.wcag.join(', ')}`);
     }
   }
-  return lines.join('\n');
+  return lines;
 }
 
 export function formatMarkdown(report: Report): string {
@@ -177,14 +215,26 @@ export function formatMarkdown(report: Report): string {
   if (report.issues.length === 0) return lines.join('\n');
   lines.push('', '| Rule | Issues |', '| --- | --- |');
   for (const [rule, count] of Object.entries(report.byRule)) lines.push(`| \`${rule}\` | ${count} |`);
-  for (const [file, issues] of byFile(report.issues)) {
+  if (report.byCriterion?.length) {
+    lines.push('', '| WCAG 2.2 | Level | EN 301 549 | Issues |', '| --- | --- | --- | --- |');
+    for (const c of report.byCriterion) lines.push(`| ${c.wcag} ${c.name} | ${c.level} | ${c.en301549 ?? '–'} | ${c.issues} |`);
+  }
+  lines.push(...markdownIssueLines(report.issues));
+  return lines.join('\n');
+}
+
+/** Issues grouped by file, as a Markdown checklist. */
+export function markdownIssueLines(list: ReportIssue[]): string[] {
+  const lines: string[] = [];
+  for (const [file, issues] of byFile(list)) {
     lines.push('', `## ${file}`, '');
     for (const issue of issues) {
       const at = issue.line ? `line ${issue.line}: ` : '';
-      lines.push(`- [ ] ${at}**${issue.ruleId}** (${label(issue)}): ${issue.message} \`${issue.element}\``);
+      const wcag = issue.wcag?.length ? ` _WCAG ${issue.wcag.join(', ')}_` : '';
+      lines.push(`- [ ] ${at}**[${issue.ruleId}](${ruleUrl(issue.ruleId)})** (${label(issue)}): ${issue.message} \`${issue.element}\`${wcag}`);
     }
   }
-  return lines.join('\n');
+  return lines;
 }
 
 function escapeData(value: string): string {
@@ -196,7 +246,7 @@ function escapeProperty(value: string): string {
 }
 
 /** GitHub Actions workflow commands, which show up as annotations on pull requests. */
-export function formatGithub(report: Report, { includeBaselined = false } = {}): string {
+export function formatGithub(report: Pick<Report, 'issues'>, { includeBaselined = false } = {}): string {
   return report.issues
     .filter((issue) => includeBaselined || !issue.baselined)
     .map((issue) => {
@@ -207,7 +257,8 @@ export function formatGithub(report: Report, { includeBaselined = false } = {}):
         issue.column && `col=${issue.column}`,
         `title=${escapeProperty(issue.ruleId)}`,
       ].filter(Boolean);
-      return `::${command} ${props.join(',')}::${escapeData(`${issue.message} ${issue.element}. Fix: ${issue.help}`)}`;
+      const standard = issue.wcag?.length ? ` (${describeCriteria(issue.wcag)})` : '';
+      return `::${command} ${props.join(',')}::${escapeData(`${issue.message} ${issue.element}. Fix: ${issue.help}${standard} Docs: ${ruleUrl(issue.ruleId)}`)}`;
     })
     .join('\n');
 }

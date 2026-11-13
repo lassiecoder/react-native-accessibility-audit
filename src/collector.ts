@@ -17,6 +17,7 @@ export interface RecordedViolation {
   severity: Severity;
   message: string;
   help: string;
+  wcag?: readonly string[];
   element: string;
   component?: string;
   source?: SourceLocation;
@@ -30,6 +31,8 @@ export interface AuditRecord {
   baseline?: string;
   passed: boolean;
   violations: RecordedViolation[];
+  /** Source files that rendered the audited tree (React 19.1+). */
+  files?: string[];
 }
 
 export function isRecording(): boolean {
@@ -42,11 +45,17 @@ export function toRecorded(violation: Violation, baselined: boolean): RecordedVi
     severity: violation.severity,
     message: violation.message,
     help: violation.help,
+    wcag: violation.wcag,
     element: describeElement(violation.element),
-    component: describeOwners(violation.element).user,
+    component: owner(violation.element),
     source: sourceLocation(violation.element),
     baselined,
   };
+}
+
+function owner(node: Violation['element']): string | undefined {
+  const { user, library } = describeOwners(node);
+  return user ?? library?.package;
 }
 
 export function recordAudit(record: AuditRecord): void {

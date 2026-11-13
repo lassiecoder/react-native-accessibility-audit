@@ -8,24 +8,36 @@ Found 6 accessibility violations:
 1. [image-label-required] Image has no label and is not marked as decorative.
    Element: expo-image Image → <ViewManagerAdapter_ExpoImage> in ProfileHeader
    Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.
+   Standard: WCAG 1.1.1 Non-text Content (A) · EN 301 549 11.1.1.1
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#image-label-required
 
 2. [image-label-required] Image has no label and is not marked as decorative.
    Element: expo-symbols SymbolView → <ViewManagerAdapter_SymbolModule> in ProfileHeader
    Fix: Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.
+   Standard: WCAG 1.1.1 Non-text Content (A) · EN 301 549 11.1.1.1
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#image-label-required
 
 3. [interactive-role-required] Interactive element has no role.
    Element: gesture-handler RectButton → <RNGestureHandlerButton> in ProfileHeader
    Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.
+   Standard: WCAG 4.1.2 Name, Role, Value (A) · EN 301 549 11.4.1.2
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-role-required
 
 4. [interactive-label-required] Interactive element has no label or text, so screen readers can only announce its role.
    Element: gesture-handler RectButton → <RNGestureHandlerButton> in ProfileHeader
    Fix: Add accessibilityLabel (or aria-label), or render visible Text inside the element.
+   Standard: WCAG 4.1.2 Name, Role, Value (A) · EN 301 549 11.4.1.2
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-label-required
 
 5. [interactive-label-required] Interactive element has no label or text, so screen readers can only announce its role.
    Element: gesture-handler BorderlessButton → <RNGestureHandlerButton> role="button" in ProfileHeader
    Fix: Add accessibilityLabel (or aria-label), or render visible Text inside the element.
+   Standard: WCAG 4.1.2 Name, Role, Value (A) · EN 301 549 11.4.1.2
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-label-required
 
 6. [interactive-role-required] Interactive element has no role.
    Element: gesture-handler Pressable → <RNGestureHandlerButton> name="Share" in ProfileHeader
-   Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does."
+   Fix: Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.
+   Standard: WCAG 4.1.2 Name, Role, Value (A) · EN 301 549 11.4.1.2
+   Docs: https://github.com/lassiecoder/react-native-accessibility-audit/blob/main/docs/rules.md#interactive-role-required"
 `;

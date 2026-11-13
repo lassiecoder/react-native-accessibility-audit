@@ -1,7 +1,7 @@
 {
   "name": "react-native-accessibility-audit",
   "version": "0.0.0",
-  "description": "Accessibility audits for React Native and Expo tests. A toBeAccessible() Jest matcher for React 19 and React Native Testing Library v14.",
+  "description": "Accessibility testing for React Native and Expo: a toBeAccessible() Jest matcher (jest-axe for React Native), WCAG 2.2 / EN 301 549 mapped rules, baselines, project reports, a static scanner, a GitHub Action and an AI agent skill.",
   "license": "MIT",
   "author": "Priyanka Sharma",
   "main": "dist/index.js",
@@ -15,6 +15,10 @@
       "types": "./dist/reporter.d.ts",
       "default": "./dist/reporter.js"
     },
+    "./scan": {
+      "types": "./dist/scan.d.ts",
+      "default": "./dist/scan.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
@@ -23,6 +27,8 @@
   "files": [
     "dist",
     "docs",
+    "skills",
+    "action.yml",
     "CHANGELOG.md"
   ],
   "keywords": [
@@ -33,7 +39,13 @@
     "a11y",
     "jest",
     "testing-library",
-    "wcag"
+    "wcag",
+    "en-301-549",
+    "european-accessibility-act",
+    "voiceover",
+    "talkback",
+    "screen-reader",
+    "jest-axe"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -48,7 +60,8 @@
     "node": "^22.13.0 || >=24"
   },
   "dependencies": {
-    "@react-native/normalize-colors": ">=0.72.0"
+    "@react-native/normalize-colors": ">=0.72.0",
+    "@babel/parser": "^7.24.0"
   },
   "peerDependencies": {
     "@testing-library/react-native": ">=14.0.0",

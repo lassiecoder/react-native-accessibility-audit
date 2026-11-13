@@ -23,11 +23,15 @@ Elements hidden from screen readers on both platforms, and everything inside the
 - [text-contrast](#text-contrast)
 - [no-nested-text-link](#no-nested-text-link)
 
+Each rule lists the WCAG 2.2 success criteria it checks and the matching EN 301 549 clause (chapter 11, software). See [Standards](../README.md#standards-wcag-22-and-en-301-549).
+
 ---
 
 ## interactive-role-required
 
 **Default: error.** Replaces `pressable-role-required` and `link-role-required`.
+
+**WCAG 2.2:** [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.4.1.2.
 
 Screen readers announce a control's role ("button", "link", "checkbox") so people know what pressing it will do. A pressable without a role is announced as plain content, or not at all on some platforms.
 
@@ -50,6 +54,8 @@ Screen readers announce a control's role ("button", "link", "checkbox") so peopl
 ## interactive-label-required
 
 **Default: error.** Replaces `pressable-label-required`.
+
+**WCAG 2.2:** [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.4.1.2.
 
 A control needs a name for the screen reader to read. If it has visible text, that text is the name. Icon-only buttons need an explicit label.
 
@@ -77,6 +83,8 @@ The name comes from `aria-label` or `accessibilityLabel`, or else the text and l
 ## input-label-required
 
 **Default: error.**
+
+**WCAG 2.2:** [3.3.2 Labels or Instructions](https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.3.3.2, 11.4.1.2.
 
 Text inputs and sliders need a label that says what they're for. A visible `Text` next to the field isn't connected to it, so the screen reader doesn't read it when the field is focused. A placeholder isn't a label either: it disappears as soon as someone types.
 
@@ -106,6 +114,8 @@ Checks `TextInput` (single and multi-line) and `Slider` from `@react-native-comm
 
 **Default: error.** Replaces `pressable-accessible-required`.
 
+**WCAG 2.2:** [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.2.1.1, 11.4.1.2.
+
 `accessible={false}` on a control removes it from the screen reader's focus order. People using VoiceOver or TalkBack can't reach it.
 
 ```tsx
@@ -125,6 +135,8 @@ Inline `Text` links are exempt, since nested text is grouped with its surroundin
 ## image-label-required
 
 **Default: error.**
+
+**WCAG 2.2:** [1.1.1 Non-text Content](https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html) (A). **EN 301 549:** 11.1.1.1.
 
 An image either carries information, and needs a description, or it's decorative and should be hidden. This rule makes you choose.
 
@@ -152,6 +164,8 @@ Also checks `Image` from `expo-image` and `SymbolView` from `expo-symbols`. Imag
 ## no-nested-interactive
 
 **Default: error.**
+
+**WCAG 2.2:** [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.2.1.1, 11.4.1.2.
 
 Screen readers usually focus only the outer control, so a control inside another one can't be reached. It also makes it unclear which action a tap triggers. The same happens on iOS inside a `View` with `accessible={true}`: VoiceOver treats the whole group as one element, so controls inside it can't be focused.
 
@@ -193,6 +207,8 @@ The inner control is the one reported. If you need several actions on one row, c
 
 **Default: error.** Replaces `checked-state-required` and `adjustable-value-required`.
 
+**WCAG 2.2:** [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.4.1.2.
+
 A checkbox that doesn't say whether it's checked, or a slider that doesn't say its value, is useless to someone who can't see it.
 
 ```tsx
@@ -222,6 +238,8 @@ Disabled state isn't checked: `Pressable`, `Touchable*` and `Button` expose `dis
 ## adjustable-role-required
 
 **Default: error.** Same ID as in react-native-accessibility-engine, with a narrower check (see below).
+
+**WCAG 2.2:** [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.2.1.1, 11.4.1.2.
 
 Custom adjustable controls, like steppers, ratings and custom sliders, usually expose `increment` and `decrement` accessibility actions. VoiceOver only offers them (swipe up or down) when the element has the `adjustable` role. Without it, people using a screen reader can't change the value.
 
@@ -256,6 +274,8 @@ Custom adjustable controls, like steppers, ratings and custom sliders, usually e
 
 **Default: error.**
 
+**WCAG 2.2:** [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.4.1.2.
+
 `accessibilityRole` and `role` take different values. `accessibilityRole` uses React Native's names (`header`, `image`) and `role` uses ARIA names (`heading`, `img`). A value from the wrong list, or a typo, is ignored by the screen reader, and some invalid values make Android throw ([react-native#57890](https://github.com/react/react-native/issues/57890)).
 
 ```tsx
@@ -274,6 +294,8 @@ The message suggests the right prop when the value is valid in the other list.
 ## accessibility-actions-valid
 
 **Default: error.**
+
+**WCAG 2.2:** [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.2.1.1, 11.4.1.2.
 
 Custom accessibility actions let screen reader users reach things sighted users do with swipes or long-press menus, such as archive, delete or reorder. They only work if every action has a name, custom actions have a label to announce, and something handles them ([react-native#47268](https://github.com/react/react-native/issues/47268), [#53496](https://github.com/react/react-native/issues/53496)).
 
@@ -300,6 +322,8 @@ The standard actions `activate`, `increment`, `decrement`, `longpress`, `magicTa
 
 **Default: error.** Same ID as in react-native-accessibility-engine.
 
+**WCAG 2.2:** [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.4.1.2.
+
 The `link` role tells people that activating the element navigates somewhere. On something that can't be pressed, it's a false promise.
 
 ```tsx
@@ -317,6 +341,8 @@ An element inside a pressable may use `link`, since the pressable handles the pr
 
 **Default: error.** Same ID as in react-native-accessibility-engine.
 
+**WCAG 2.2:** none directly; best practice. Empty text elements become silent focus stops.
+
 Empty `Text` elements can become focus stops that read nothing.
 
 ```tsx
@@ -333,6 +359,8 @@ Empty `Text` elements can become focus stops that read nothing.
 ## consistent-hiding
 
 **Default: error.**
+
+**WCAG 2.2:** [1.3.1 Info and Relationships](https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html) (A). **EN 301 549:** 11.1.3.1.
 
 `accessibilityElementsHidden` only works on iOS and `importantForAccessibility="no-hide-descendants"` only on Android. Using one of them hides content from one screen reader and leaves it for the other.
 
@@ -359,6 +387,8 @@ Not reported when an ancestor already hides the content on the other platform, o
 ## modal-hides-background
 
 **Default: error.**
+
+**WCAG 2.2:** [1.3.1 Info and Relationships](https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html) (A), [2.4.3 Focus Order](https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html) (A). **EN 301 549:** 11.1.3.1, 11.2.4.3.
 
 Custom modals and bottom sheets that leave the screen behind them readable are among the most reported accessibility bugs in React Native libraries ([react-native-bottom-sheet#2110](https://github.com/gorhom/react-native-bottom-sheet/issues/2110)). `aria-modal` and `accessibilityViewIsModal` don't solve it on their own:
 
@@ -387,11 +417,13 @@ Custom modals and bottom sheets that leave the screen behind them readable are a
 </View>
 ```
 
-Siblings without readable content, such as an empty backdrop, are ignored. React Native's `Modal` component renders in its own native window and doesn't need this.
+Siblings without readable content, such as an empty backdrop, are ignored. React Native's `Modal` component renders in its own native window and doesn't need this: content outside a `Modal` isn't checked, so `accessibilityViewIsModal` inside a `Modal` (as [react-native-element-dropdown](https://github.com/hoaphantn7604/react-native-element-dropdown/issues/214)'s maintained fork does) is fine.
 
 ## no-disabled-font-scaling
 
 **Default: error.**
+
+**WCAG 2.2:** [1.4.4 Resize Text](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html) (AA). **EN 301 549:** 11.1.4.4.
 
 People with low vision rely on the system text size. WCAG 1.4.4 requires text to resize to 200%. `allowFontScaling={false}` turns that off, and so does `maxFontSizeMultiplier={1}`.
 
@@ -411,6 +443,8 @@ If a layout breaks at large sizes, fix the layout: use `minHeight` instead of `h
 ## touch-target-size
 
 **Default: warning.**
+
+**WCAG 2.2:** [2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) (AA). **EN 301 549:** 11.2.5.8. (V4.1.1 only; V3.2.1 is based on WCAG 2.1).
 
 Small targets are hard to hit, especially for people with motor impairments. Apple recommends 44×44pt and Material Design 48×48dp. WCAG 2.2 sets 24×24 as the AA minimum and 44×44 for AAA.
 
@@ -436,6 +470,8 @@ Change the minimum with `minTouchTarget` (default `44`).
 ## text-contrast
 
 **Default: warning.**
+
+**WCAG 2.2:** [1.4.3 Contrast (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) (AA). **EN 301 549:** 11.1.4.3.
 
 Text needs enough contrast with its background to be readable in sunlight, on dim screens and with low vision. WCAG AA requires 4.5:1 for normal text and 3:1 for large text (24 or larger, or 18.66 or larger and bold).
 
@@ -467,6 +503,8 @@ All color formats React Native accepts work (`#rgb`, `#rrggbbaa`, `rgb()`, `rgba
 ## no-nested-text-link
 
 **Default: warning.**
+
+**WCAG 2.2:** [2.1.1 Keyboard](https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html) (A), [4.1.2 Name, Role, Value](https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html) (A). **EN 301 549:** 11.2.1.1, 11.4.1.2.
 
 A pressable `Text` inside another `Text`, such as a "terms" link in a sentence, can't be focused on its own by VoiceOver on iOS ([react-native#53243](https://github.com/react/react-native/issues/53243)), and behaves inconsistently with TalkBack ([#53240](https://github.com/react/react-native/issues/53240)).
 

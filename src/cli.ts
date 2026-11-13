@@ -2,7 +2,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { formatGithub, formatMarkdown, formatText, type Report } from './report';
+import { formatGithub, formatMarkdown, formatText, issueLines, markdownIssueLines, type Report } from './report';
+import { scanProject } from './scan';
 
 const USAGE = `Usage: react-native-accessibility-audit <command> [options]
 
@@ -12,8 +13,17 @@ Commands:
     --fail-on <s>    Exit with 1 if there are errors (error) or errors or warnings (warn). Default: none
     --include-baselined  With --format github, also annotate baselined issues as notices
 
+  scan [dir]         Check source files without running tests: controls, images and inputs
+                     missing roles or labels, and component files no test audits (default dir: .)
+    --format <f>     text (default), markdown, github or json
+    --report <file>  Reporter output used for test coverage (default: a11y-report.json, if present)
+    --fail-on <s>    Exit with 1 if there are errors (error) or any issues (warn). Default: none
+
   baselines [dir]    List the violations recorded in baseline files under dir (default: .)
     --format <f>     text (default), markdown or json
+
+  skill [dir]        Install the AI agent skill (Claude Code, Codex, Cursor and other tools that
+                     read Agent Skills) into dir (default: .claude/skills)
 
   help               Show this message
 `;
@@ -139,10 +149,76 @@ function baselines({ positional, flags }: Args, out: (s: string) => void): numbe
   return 0;
 }
 
+function scan({ positional, flags }: Args, out: (s: string) => void): number {
+  const root = path.resolve(positional[0] ?? '.');
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new UsageError(`${root} is not a directory.`);
+  const format = choice(flags, 'format', ['text', 'markdown', 'github', 'json'], 'text');
+  const failOn = choice(flags, 'fail-on', ['error', 'warn', 'none'], 'none');
+
+  // Coverage paths in the report are relative to Jest's rootDir, which is
+  // normally the directory the CLI runs in.
+  const reportFile = typeof flags.report === 'string' ? path.resolve(flags.report) : path.resolve('a11y-report.json');
+  let coverage: string[] | undefined;
+  let note: string | undefined;
+  if (fs.existsSync(reportFile)) {
+    const data = JSON.parse(fs.readFileSync(reportFile, 'utf8')) as Partial<Report>;
+    const files = data.coverage?.files ?? [];
+    if (files.length > 0) coverage = files.map((f) => path.relative(root, path.resolve(f)).split(path.sep).join('/'));
+    else note = `${path.relative(process.cwd(), reportFile)} has no coverage data. It needs React 19.1+ and tests that use toBeAccessible().`;
+  } else if (typeof flags.report === 'string') {
+    throw new UsageError(`No report at ${flags.report}.`);
+  }
+
+  const result = scanProject(root, { coverage });
+  const errors = result.issues.filter((i) => i.severity === 'error').length;
+  const untested = result.untested ?? [];
+  const parts = [`${result.issues.length} issue${result.issues.length === 1 ? '' : 's'} in ${result.files} file${result.files === 1 ? '' : 's'}`];
+  if (result.untested) parts.push(`${untested.length} component file${untested.length === 1 ? '' : 's'} not audited by any test`);
+  const summary = `Static accessibility scan: ${parts.join(', ')}.`;
+
+  if (format === 'json') {
+    out(JSON.stringify({ tool: 'react-native-accessibility-audit', ...result }, null, 2));
+  } else if (format === 'github') {
+    const lines = [formatGithub(result)].filter(Boolean);
+    for (const file of untested) lines.push(`::notice file=${file},title=Not audited::No toBeAccessible() test renders this file.`);
+    out(lines.join('\n'));
+  } else if (format === 'markdown') {
+    const lines = ['# Static accessibility scan', '', summary, ...markdownIssueLines(result.issues)];
+    if (untested.length) lines.push('', '## Not audited by any test', '', ...untested.map((f) => `- [ ] \`${f}\``));
+    if (note) lines.push('', `> ${note}`);
+    out(lines.join('\n'));
+  } else {
+    const lines = [summary, ...issueLines(result.issues)];
+    if (untested.length) lines.push('', 'Not audited by any toBeAccessible() test:', ...untested.map((f) => `  ${f}`));
+    if (note) lines.push('', note);
+    if (!result.untested && !note) lines.push('', 'Run Jest with the reporter first to also list component files no test audits.');
+    out(lines.join('\n'));
+  }
+  for (const { file, error } of result.skipped) process.stderr.write(`Could not parse ${file}: ${error}\n`);
+
+  if (failOn === 'error' && errors > 0) return 1;
+  if (failOn === 'warn' && (result.issues.length > 0 || untested.length > 0)) return 1;
+  return 0;
+}
+
+const SKILL_NAME = 'react-native-accessibility-audit';
+
+function skill({ positional }: Args, out: (s: string) => void): number {
+  // dist/cli.js and src/cli.ts both sit one level below the package root.
+  const source = path.join(__dirname, '..', 'skills', SKILL_NAME, 'SKILL.md');
+  const target = path.resolve(positional[0] ?? path.join('.claude', 'skills'), SKILL_NAME, 'SKILL.md');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(source, target);
+  out(`Installed the accessibility skill to ${path.relative(process.cwd(), target)}. Commit it so everyone's agent uses it.`);
+  return 0;
+}
+
 export function main(argv: string[], out: (s: string) => void = (s) => process.stdout.write(`${s}\n`)): number {
   const [command, ...rest] = argv;
   try {
     if (command === 'report') return report(parseArgs(rest), out);
+    if (command === 'scan') return scan(parseArgs(rest), out);
+    if (command === 'skill') return skill(parseArgs(rest), out);
     if (command === 'baselines') return baselines(parseArgs(rest), out);
     if (command === undefined || command === 'help' || command === '--help' || command === '-h') {
       out(USAGE);

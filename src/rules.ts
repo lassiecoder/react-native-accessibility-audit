@@ -17,6 +17,7 @@ import {
   hidesOnIOS,
   isImage,
   isInteractive,
+  isNativeModal,
   isNativeSlider,
   isSwitch,
   isText,
@@ -34,6 +35,7 @@ const ANDROID_ONLY_NOTE = ' aria-labelledby / accessibilityLabelledBy only work 
 
 const interactiveRoleRequired: Rule = {
   id: 'interactive-role-required',
+  wcag: ['4.1.2'],
   severity: 'error',
   description: 'Interactive elements must expose a role.',
   help: 'Add accessibilityRole (or role), e.g. "button" or "link", so screen readers announce what the element does.',
@@ -50,6 +52,7 @@ const interactiveRoleRequired: Rule = {
 
 const inputLabelRequired: Rule = {
   id: 'input-label-required',
+  wcag: ['3.3.2', '4.1.2'],
   severity: 'error',
   description: 'Text inputs and sliders must have a label.',
   help: 'Add accessibilityLabel (or aria-label) describing the field, usually the same text as its visible label. A placeholder is not a label: it disappears once someone types.',
@@ -66,6 +69,7 @@ const inputLabelRequired: Rule = {
 
 const interactiveAccessibleRequired: Rule = {
   id: 'interactive-accessible-required',
+  wcag: ['2.1.1', '4.1.2'],
   severity: 'error',
   description: 'Interactive elements must be focusable by screen readers.',
   help: 'Remove accessible={false} from the control. To group it with other content, make the parent accessible instead.',
@@ -79,6 +83,7 @@ const interactiveAccessibleRequired: Rule = {
 
 const interactiveLabelRequired: Rule = {
   id: 'interactive-label-required',
+  wcag: ['4.1.2'],
   severity: 'error',
   description: 'Interactive elements must have an accessible name.',
   help: 'Add accessibilityLabel (or aria-label), or render visible Text inside the element.',
@@ -92,6 +97,7 @@ const interactiveLabelRequired: Rule = {
 
 const imageLabelRequired: Rule = {
   id: 'image-label-required',
+  wcag: ['1.1.1'],
   severity: 'error',
   description: 'Images must have a label or be marked as decorative.',
   help: 'Add accessibilityLabel (or alt) describing the image. If it is decorative, mark it in a way both platforms understand: alt="", aria-hidden, or accessible={false}.',
@@ -114,6 +120,7 @@ const imageLabelRequired: Rule = {
 
 const noNestedInteractive: Rule = {
   id: 'no-nested-interactive',
+  wcag: ['2.1.1', '4.1.2'],
   severity: 'error',
   description: 'Interactive elements must not be nested inside other interactive elements or accessible groups.',
   help: 'Move the inner control out of the outer one, or remove accessible={true} from the grouping View. Screen readers focus the outer element as one item, so the inner control cannot be reached.',
@@ -129,6 +136,7 @@ const noNestedInteractive: Rule = {
 
 const stateRequired: Rule = {
   id: 'state-required',
+  wcag: ['4.1.2'],
   severity: 'error',
   description: 'Checkable and adjustable controls must expose their current state.',
   help: 'Set accessibilityState={{ checked }} (or aria-checked) on checkboxes, radios, switches and toggle buttons; set accessibilityValue (or aria-valuenow / aria-valuetext) on adjustable controls.',
@@ -154,6 +162,7 @@ const stateRequired: Rule = {
 
 const adjustableRoleRequired: Rule = {
   id: 'adjustable-role-required',
+  wcag: ['2.1.1', '4.1.2'],
   severity: 'error',
   description: 'Controls that can be incremented or decremented must have an adjustable role.',
   help: 'Set accessibilityRole="adjustable" (or role="slider"). VoiceOver only offers swipe up/down for increment and decrement on adjustable elements. Native sliders need no role; remove any other role you set on them.',
@@ -172,6 +181,7 @@ const adjustableRoleRequired: Rule = {
 
 const linkRoleMisused: Rule = {
   id: 'link-role-misused',
+  wcag: ['4.1.2'],
   severity: 'error',
   description: 'The "link" role must only be used on elements that can be activated.',
   help: 'Add onPress to the element, or remove role="link" if it is not a link.',
@@ -184,6 +194,7 @@ const linkRoleMisused: Rule = {
 
 const noEmptyText: Rule = {
   id: 'no-empty-text',
+  wcag: [],
   severity: 'error',
   description: 'Text elements must not be empty.',
   help: 'Remove the empty Text, or render it only when it has content. Empty text creates a silent stop for screen readers.',
@@ -198,6 +209,7 @@ const noEmptyText: Rule = {
 
 const consistentHiding: Rule = {
   id: 'consistent-hiding',
+  wcag: ['1.3.1'],
   severity: 'error',
   description: 'Content hidden from screen readers must be hidden on both iOS and Android.',
   help: 'Use aria-hidden, which works on both platforms, or set accessibilityElementsHidden (iOS) together with importantForAccessibility="no-hide-descendants" (Android).',
@@ -226,6 +238,7 @@ function hasReadableContent(node: HostNode, hidden: (n: HostNode) => boolean): b
 
 const modalHidesBackground: Rule = {
   id: 'modal-hides-background',
+  wcag: ['1.3.1', '2.4.3'],
   severity: 'error',
   description: 'Content behind a modal must be hidden from screen readers.',
   help: 'aria-modal / accessibilityViewIsModal only work on iOS, and only hide the modal\'s sibling views. While the modal is open, set importantForAccessibility="no-hide-descendants" on the content behind it (or aria-hidden, for both platforms), or render the modal with React Native\'s Modal component.',
@@ -233,7 +246,8 @@ const modalHidesBackground: Rule = {
     if (node.props['aria-modal'] !== true && node.props.accessibilityViewIsModal !== true) return null;
     const androidExposed: HostNode[] = [];
     const bothExposed: HostNode[] = [];
-    for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
+    // React Native's Modal is its own window: nothing outside it is reachable.
+    for (let child = node, parent = node.parent; parent && !isNativeModal(child); child = parent, parent = parent.parent) {
       const direct = child === node;
       for (const sibling of parent.children) {
         if (typeof sibling === 'string' || sibling === child) continue;
@@ -257,6 +271,7 @@ const modalHidesBackground: Rule = {
 
 const noDisabledFontScaling: Rule = {
   id: 'no-disabled-font-scaling',
+  wcag: ['1.4.4'],
   severity: 'error',
   description: 'Text must grow with the system font size (WCAG 1.4.4).',
   help: 'Remove allowFontScaling={false}. If a layout breaks at large sizes, fix the layout (minHeight instead of height, let text wrap), or limit growth with maxFontSizeMultiplier; 2 or more still allows the 200% WCAG requires.',
@@ -277,6 +292,7 @@ const noDisabledFontScaling: Rule = {
 
 const accessibilityActionsValid: Rule = {
   id: 'accessibility-actions-valid',
+  wcag: ['2.1.1', '4.1.2'],
   severity: 'error',
   description: 'Accessibility actions must have names, labels for custom actions, and a handler.',
   help: 'Give every action a name, give custom actions (anything other than activate, increment, decrement, longpress, magicTap, escape) a label for screen readers to announce, and handle them in onAccessibilityAction.',
@@ -300,6 +316,7 @@ const accessibilityActionsValid: Rule = {
 
 const roleValid: Rule = {
   id: 'role-valid',
+  wcag: ['4.1.2'],
   severity: 'error',
   description: 'Roles must be values React Native supports.',
   help: 'Use a supported value. accessibilityRole takes React Native names ("header", "image"); role takes ARIA names ("heading", "img"). Unsupported values are ignored, and some make Android throw.',
@@ -319,6 +336,7 @@ const roleValid: Rule = {
 
 const noNestedTextLink: Rule = {
   id: 'no-nested-text-link',
+  wcag: ['2.1.1', '4.1.2'],
   severity: 'warn',
   description: 'Pressable text inside a paragraph may not be reachable with a screen reader.',
   help: 'Render the link as its own Text outside the paragraph, or make the whole paragraph the pressable element. If you keep it inline, test it with VoiceOver and TalkBack.',
@@ -344,6 +362,7 @@ function hitSlop(value: unknown): { top: number; bottom: number; left: number; r
 // Elements without a numeric width/height are skipped rather than guessed.
 const touchTargetSize: Rule = {
   id: 'touch-target-size',
+  wcag: ['2.5.8'],
   severity: 'warn',
   description: 'Touch targets should be large enough to tap reliably.',
   help: 'Increase width/height (or minWidth/minHeight), or add hitSlop to extend the touchable area without changing the layout.',
@@ -378,6 +397,7 @@ function isLargeText(node: HostNode): boolean {
 // the Text (or an enclosing Text) and an opaque background on an ancestor.
 const textContrast: Rule = {
   id: 'text-contrast',
+  wcag: ['1.4.3'],
   severity: 'warn',
   description: 'Text should have enough contrast with its background (WCAG AA).',
   help: 'Darken or lighten the text or background color. WCAG AA needs 4.5:1 for normal text and 3:1 for large text.',

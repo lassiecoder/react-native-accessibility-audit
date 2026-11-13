@@ -1,6 +1,7 @@
 import { getGlobalOptions, mergeOptions } from './config';
 import { ownComponentNames } from './fiber';
 import { rules } from './rules';
+import { libraryOrigin } from './source';
 import { isHostNode, walk } from './tree';
 import type { AuditOptions, HostNode, IgnoreOptions, Matcher, Severity, Violation } from './types';
 
@@ -90,14 +91,16 @@ export function audit(target: unknown, options: AuditOptions = {}): Violation[] 
     if (severity !== 'off') active.push({ rule, severity });
   }
 
+  const packages = ignore.packages ?? [];
   const violations: Violation[] = [];
   walk(
     root,
     (node) => {
+      if (packages.length && libraryOrigin(node).packages.some((p) => matches(p, packages))) return;
       for (const { rule, severity } of active) {
         const message = rule.check(node, context);
         if (message) {
-          violations.push({ ruleId: rule.id, severity, message, help: rule.help, element: node });
+          violations.push({ ruleId: rule.id, severity, message, help: rule.help, wcag: rule.wcag, element: node });
         }
       }
     },
